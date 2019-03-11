@@ -1,7 +1,6 @@
 # PCL_Compiler
 
-## Course: Compilers 2019
-## NTUA ECE 7th Semester
+## Course: Compilers NTUA ECE 7th Semester 2019
 
 ### Team:
-1. lykmast
+#### 1. lykmast
