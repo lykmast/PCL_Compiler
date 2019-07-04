@@ -3,7 +3,7 @@
 %{
 	#define T_eof 0
 	#define T_id 1001
-	#define T_const 1002
+	// #define T_cconst 1002
 	#define T_var 1003
 	#define T_integer 1004
 	#define T_boolean 1005
@@ -40,12 +40,17 @@
 	#define T_dt 1036
 	#define T_lt 1037
 	#define T_gt 1038
+	#define T_iconst 1039
+	#define T_rconst 1040
+	#define T_sconst 1041
+	#define T_cconst 1042
 %}
 L [a-zA-Z]
 D [0-9]
+E \\(n|t|r|\'|\"|0)?
 W [ \t\r\n]
 %%
-"var" {return T_var;}
+"var" {return T_var;/*'*/}
 "integer" {return T_integer;}
 "boolean" {return T_boolean;}
 "char" {return T_char;}
@@ -78,7 +83,10 @@ W [ \t\r\n]
 "new" {return T_new;}
 "result" {return T_result;}
 {L}(_|{L}|{D})* {return T_id;}
-({D}+(\.{D}*(e\-?{D}+)?)?)|(\"([^\"])*\") {return T_const;/*"*/}
+(\-|\+)?{D}+\.{D}+(e(\-|\+)?{D}+)? {return T_rconst;}
+(\-|\+)?{D}+ {return T_iconst;}
+\"([^\"\\]|{E})*\" {return T_sconst;/*"*/}
+\'([^\"\\]|{E})\'	{return T_cconst;/*'*/}
 ":=" {return T_assign;}
 "<>" {return T_dt;}
 "<=" {return T_lt;}

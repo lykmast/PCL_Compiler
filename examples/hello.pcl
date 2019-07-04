@@ -1,4 +1,10 @@
 program hello;
 begin
-  writeString("Hello world!\n")
+var arr: array of integer t[50]
+	t1: real
+	t1=-2.28e15
+	'!'
+	writeString("Hello world!\n")
+
+
 end.
