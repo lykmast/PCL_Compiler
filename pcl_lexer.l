@@ -86,12 +86,12 @@ W [ \t\r\n]
 (\-|\+)?{D}+\.{D}+(e(\-|\+)?{D}+)? {return T_rconst;}
 (\-|\+)?{D}+ {return T_iconst;}
 \"([^\"\\]|{E})*\" {return T_sconst;/*"*/}
-\'([^\"\\]|{E})\'	{return T_cconst;/*'*/}
+\'([^\'\\]|{E})\'	{return T_cconst;/*'*/}
 ":=" {return T_assign;}
 "<>" {return T_dt;}
 "<=" {return T_lt;}
 ">=" {return T_gt;}
-[\[\]()+-/%*:;.<>@^=] {return yytext[0];}
+[\[\]()+/\-*:;.<>@^=] {return yytext[0];}
 {W}+  {/* nothing */}
 "(*"[.\n]*"*)" {/* nothing' */}
 . {
