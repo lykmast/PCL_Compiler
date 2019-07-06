@@ -1,7 +1,9 @@
 %{
 #include <cstdio>
-#include "lexer.hpp"
+#include "pcl_lexer.hpp"
 %}
+
+%expect 1
 
 %token T_id
 %token T_var "var"
@@ -45,10 +47,17 @@
 %token T_sconst
 %token T_cconst
 
-%left '+' '-'
-%left '*' '/'
 
-%expect 1
+%nonassoc '=' '<' '>' "<=" ">=" "<>"
+%left '+' '-' "or"
+%left '*' '/' "div" "mod" "and"
+%nonassoc "not"
+%nonassoc UMINUS UPLUS
+%nonassoc '^'
+%nonassoc '@'
+%nonassoc BRACKETS
+
+
 
 %%
 
@@ -63,7 +72,7 @@ body:
 
 local:
   "var" var_decl
-| label mult_ids ';'
+| "label" mult_ids ';'
 | header ';' body ';'
 | "forward" header ';'
 ;
@@ -110,10 +119,10 @@ stmt:
 | l_value ":=" expr
 | block
 | call
-| "if" expr "then" stmt
 | "if" expr "then" stmt "else" stmt
+| "if" expr "then" stmt
 | "while" expr "do" stmt
-| T_id: stmt
+| T_id ':' stmt
 | "goto" T_id
 | "return"
 | "new" '[' expr ']' l_value
@@ -128,14 +137,13 @@ l_value:
   T_id;
 | "result"
 | T_sconst
-| l_value '[' expr ']'
+| l_value '[' expr ']' %prec BRACKETS
 | expr '^'
 | '(' l_value ')'
 ;
 
 r_value:
-  T_id
-| T_rconst
+  T_rconst
 | T_iconst
 | T_cconst
 | "true"
@@ -159,8 +167,8 @@ r_value:
 | expr "and" expr
 | expr "or" expr
 | "not" expr
-| '+' expr
-| '-' expr
+| '+' expr %prec UPLUS
+| '-' expr %prec UMINUS
 ;
 
 call:
@@ -169,7 +177,7 @@ call:
 
 mult_exprs:
   expr
-| expr, mult_exprs
+| expr ',' mult_exprs
 ;
 
 %%
