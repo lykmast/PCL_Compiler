@@ -1,6 +1,11 @@
 %option noyywrap
 
 %{
+	#include <cstdio>
+	#include <cstdlib>
+	#include "pcl_lexer.hpp"
+	#include "parser.hpp"
+
 	#define T_eof 0
 	#define T_id 1001
 	// #define T_cconst 1002
@@ -99,21 +104,27 @@ W [ \t\r\n]
 	exit(1);
 }
 %%
-#ifdef yyFlexLexer
-int main () {
-	yyFlexLexer lexer;
-	int token;
-	do {
-		token = lexer.yylex();
-		printf("token=%d, lexeme=\"%s\"\n", token, lexer.YYText());
-	} while (token != T_eof);
+
+void yyerror(const char *msg) {
+  fprintf(stderr, "%s\n", msg);
+  exit(1);
 }
-#else
-int main () {
-	int token;
-	do {
-		token = yylex();
-		printf("token=%d, lexeme=\"%s\"\n", token, yytext);
-	} while (token != T_eof);
-}
-#endif
+
+// #ifdef yyFlexLexer
+// int main () {
+// 	yyFlexLexer lexer;
+// 	int token;
+// 	do {
+// 		token = lexer.yylex();
+// 		printf("token=%d, lexeme=\"%s\"\n", token, lexer.YYText());
+// 	} while (token != T_eof);
+// }
+// #else
+// int main () {
+// 	int token;
+// 	do {
+// 		token = yylex();
+// 		printf("token=%d, lexeme=\"%s\"\n", token, yytext);
+// 	} while (token != T_eof);
+// }
+// #endif

@@ -14,8 +14,26 @@ CFLAGS=-Wall
 # 	$(RM) *.o compiler.tab.c compiler.tab.h compiler.lex.c core
 #
 # distclean: clean$(RM) compiler
-pcl_lexer: pcl_lexer.cpp
-	$(CC) -o pcl_lexer pcl_lexer.cpp
+
+default: pcl
+# pcl_lexer: pcl_lexer.cpp
+# 	$(CC) -o pcl_lexer pcl_lexer.cpp
 
 pcl_lexer.cpp:pcl_lexer.l
-	flex -o pcl_lexer.cpp pcl_lexer.l 
+	flex -s -o pcl_lexer.cpp pcl_lexer.l
+
+pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp
+
+parser.hpp parser.cpp: parser.y
+	bison -dv -o parser.cpp parser.y
+
+parser.o: parser.cpp pcl_lexer.hpp
+
+pcl: pcl_lexer.o parser.o
+	$(CC) $(CFLAGS) -o pcl pcl_lexer.o parser.o
+
+clean:
+	$(RM) pcl_lexer.cpp parser.cpp parser.hpp parser.output *.o
+
+distclean: clean
+	$(RM) pcl
