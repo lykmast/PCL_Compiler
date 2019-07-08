@@ -194,7 +194,12 @@ r_value:
 ;
 
 call:
-  T_id '('mult_exprs')'
+  T_id '('params')'
+;
+
+params:
+
+|mult_exprs
 ;
 
 mult_exprs:
