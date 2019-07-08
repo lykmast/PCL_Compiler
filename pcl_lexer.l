@@ -52,7 +52,7 @@ W [ \t\r\n]
 "<>" {return T_dt;}
 "<=" {return T_lt;}
 ">=" {return T_gt;}
-[\[\]()+/\-*:;.<>@^=] {return yytext[0];}
+[\[\]()+/\-*:;.<>@^=,] {return yytext[0];}
 {W}+  {/* nothing */}
 "(*"[.\n]*"*)" {/* nothing' */}
 . {
