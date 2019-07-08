@@ -1,6 +1,8 @@
 %{
 #include <cstdio>
 #include "pcl_lexer.hpp"
+#include "ast.hpp"
+#include <string>
 %}
 
 %define parse.error verbose
