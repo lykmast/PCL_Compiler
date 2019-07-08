@@ -5,50 +5,6 @@
 	#include <cstdlib>
 	#include "pcl_lexer.hpp"
 	#include "parser.hpp"
-
-	#define T_eof 0
-	#define T_id 1001
-	// #define T_cconst 1002
-	#define T_var 1003
-	#define T_integer 1004
-	#define T_boolean 1005
-	#define T_char 1006
-	#define T_real 1007
-	#define T_array 1008
-	#define T_of 1009
-	#define T_program 1010
-	#define T_procedure 1011
-	#define T_forward 1012
-	#define T_function 1013
-	#define T_begin 1014
-	#define T_end 1015
-	#define T_if 1016
-	#define T_then 1017
-	#define T_else 1018
-	#define T_while 1019
-	#define T_do 1020
-	#define T_goto 1021
-	#define T_label 1022
-	#define T_return 1023
-	#define T_not 1024
-	#define T_and 1025
-	#define T_or 1026
-	#define T_div 1027
-	#define T_mod 1028
-	#define T_true 1029
-	#define T_false 1030
-	#define T_nil 1031
-	#define T_dispose 1032
-	#define T_new 1033
-	#define T_result 1034
-	#define T_assign 1035
-	#define T_dt 1036
-	#define T_lt 1037
-	#define T_gt 1038
-	#define T_iconst 1039
-	#define T_rconst 1040
-	#define T_sconst 1041
-	#define T_cconst 1042
 %}
 L [a-zA-Z]
 D [0-9]
