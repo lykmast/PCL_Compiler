@@ -3,6 +3,7 @@
 #include "pcl_lexer.hpp"
 %}
 
+%define parse.error verbose
 %expect 1
 
 %token T_id
