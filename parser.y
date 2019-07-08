@@ -94,16 +94,28 @@ type:
 | "boolean"
 | "char"
 | "array" '[' T_iconst ']' "of" type
-| "array" '[' T_iconst ']' "of" '^' type
+| "array" "of" type
+| '^' type
 ;
 
 header:
-  "procedure" T_id '(' mult_formals ')'
-| "function" T_id '(' mult_formals ')' ':' type
+  "procedure" T_id '(' args ')'
+| "function" T_id '(' args ')' ':' type
+;
+
+args:
+
+| mult_formals
+;
 
 mult_formals:
+  formal
+| formal ';' mult_formals
+;
+
+formal:
   "var" mult_ids ':' type
-| "var" mult_ids ':' type ';' mult_formals
+| mult_ids ':' type
 ;
 
 block:
@@ -127,7 +139,9 @@ stmt:
 | "goto" T_id
 | "return"
 | "new" '[' expr ']' l_value
+| "new" l_value
 | "dispose" '[' ']' l_value
+| "dispose" l_value
 ;
 
 expr:
@@ -135,19 +149,19 @@ expr:
 | r_value
 
 l_value_ref:
-T_id;
+  T_id;
 | "result"
 | T_sconst
 | l_value_ref '[' expr ']' %prec BRACKETS
 | '(' l_value ')'
 
 l_value:
- expr '^'
- | T_id;
- | "result"
- | T_sconst
- | l_value '[' expr ']' %prec BRACKETS
- | '(' l_value ')'
+  expr '^'
+| T_id;
+| "result"
+| T_sconst
+| l_value '[' expr ']' %prec BRACKETS
+| '(' l_value ')'
 ;
 
 r_value:
