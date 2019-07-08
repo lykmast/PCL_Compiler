@@ -45,8 +45,8 @@ W [ \t\r\n]
 "new" {return T_new;}
 "result" {return T_result;}
 {L}(_|{L}|{D})* {return T_id;}
-(\-|\+)?{D}+\.{D}+(e(\-|\+)?{D}+)? {return T_rconst;}
-(\-|\+)?{D}+ {return T_iconst;}
+{D}+\.{D}+(e(\-|\+)?{D}+)? {return T_rconst;}
+{D}+ {return T_iconst;}
 \"([^\"\\]|{E})*\" {return T_sconst;/*"*/}
 \'([^\'\\]|{E})\'	{return T_cconst;/*'*/}
 ":=" {return T_assign;}
