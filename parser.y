@@ -133,13 +133,20 @@ expr:
   l_value
 | r_value
 
-l_value:
-  T_id;
+l_value_ref:
+T_id;
 | "result"
 | T_sconst
-| l_value '[' expr ']' %prec BRACKETS
-| expr '^'
+| l_value_ref '[' expr ']' %prec BRACKETS
 | '(' l_value ')'
+
+l_value:
+ expr '^'
+ | T_id;
+ | "result"
+ | T_sconst
+ | l_value '[' expr ']' %prec BRACKETS
+ | '(' l_value ')'
 ;
 
 r_value:
@@ -151,7 +158,7 @@ r_value:
 | '(' r_value ')'
 | "nil"
 | call
-| '@' l_value
+| '@' l_value_ref
 | expr '+' expr
 | expr '-' expr
 | expr '*' expr

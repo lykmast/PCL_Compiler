@@ -1,10 +1,4 @@
 program hello;
 begin
-var arr: array of integer t[50]
-	t1: real
-	t1=-2.28e15
-	'!'
-	writeString("Hello world!\n")
-
-
+writeString(”Hello world!\n”)
 end.
