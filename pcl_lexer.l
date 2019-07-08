@@ -1,11 +1,12 @@
 %option noyywrap
-
+%x C_COMMENT
 %{
 	#include <cstdio>
 	#include <cstdlib>
 	#include "pcl_lexer.hpp"
 	#include "parser.hpp"
 %}
+
 L [a-zA-Z]
 D [0-9]
 E \\(n|t|r|\'|\"|0)?
@@ -54,7 +55,10 @@ W [ \t\r\n]
 ">=" {return T_gt;}
 [\[\]()+/\-*:;.<>@^=,] {return yytext[0];}
 {W}+  {/* nothing */}
-"(*"[.\n]*"*)" {/* nothing' */}
+"(*"            { BEGIN(C_COMMENT); }
+<C_COMMENT>"*)" { BEGIN(INITIAL); }
+<C_COMMENT>.    { }
+<C_COMMENT>\n { }
 . {
 	fprintf(stderr, "Illegal character with code %d\n",yytext[0]);
 	exit(1);
