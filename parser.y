@@ -6,9 +6,10 @@
 %}
 
 %define parse.error verbose
+%define api.value.type "variant"
 %expect 1
 
-%token T_id
+%token<std::string> T_id
 %token T_var "var"
 %token T_integer "integer"
 %token T_boolean "boolean"
@@ -45,10 +46,10 @@
 %token T_dt "<>"
 %token T_lt "<="
 %token T_gt ">="
-%token T_iconst
-%token T_rconst
-%token T_sconst
-%token T_cconst
+%token<int> T_iconst
+%token<double> T_rconst
+%token<std::string> T_sconst
+%token<char> T_cconst
 
 
 %nonassoc '=' '<' '>' "<=" ">=" "<>"
@@ -60,24 +61,16 @@
 %nonassoc '@'
 %nonassoc BRACKETS
 
-%union {
-  Block *block;
-  Stmt *stmt;
-  Expr *expr;
-  std::string var;
-  int num;
-  char op;
-}
 
-%type<block> program block mult_stmts mult_ids mult_exprs mult_formals
-%type<stmt>  stmt
-%type<expr>  expr
+%type<Block*> program block mult_stmts mult_ids mult_exprs mult_formals
+%type<Stmt*>  stmt
+%type<Expr*>  expr
 
 
 %%
 
 program:
-  "program" T_id ';' body '.'
+  "program" T_id ';' body '.' {$4->name($2); $$=$4;}
 ;
 
 body:
@@ -90,14 +83,14 @@ mult_locals:
 ;
 
 local:
-  "var" var_decl {/*TODO*/}
-| "label" mult_ids ';' {$$=new Label($2);}
+  "var" var_decl {$$ = $2;}
+| "label" mult_ids ';' {$$ = new Label($2);}
 | header ';' body ';' {$1->body($3); $$=$1;}
-| "forward" header ';' {$$=new Forward($2);}
+| "forward" header ';' {$$ = new Forward($2);}
 ;
 
 var_decl:
-  mult_ids ':' type ';' {$1->type($3); $$=$1;}
+  mult_ids ':' type ';' {$1->type($3); $$ = $1;}
 | var_decl ';' mult_ids ':' type {$1->append_decl($2); $1->type($3); $$=$1;}
 ;
 
@@ -107,18 +100,18 @@ mult_ids:
 ;
 
 type:
-  "integer"
-| "real"
-| "boolean"
-| "char"
-| "array" '[' T_iconst ']' "of" type
-| "array" "of" type
-| '^' type
+  "integer" {$$=new Type("integer");}
+| "real"  {$$ = new Type("real");}
+| "boolean" {$$ = new Type("boolean");}
+| "char" {$$ = new Type("char");}
+| "array" '[' T_iconst ']' "of" type {$$ = new Type("array",$3,$6);}
+| "array" "of" type {$$ = new Type("array",$3);}
+| '^' type {$$ = new Type("pointer",$2);}
 ;
 
 header:
-  "procedure" T_id '(' args ')' {$$ = new Procedure($2,$4);}
-| "function" T_id '(' args ')' ':' type {$$ = new Function($2,$4);}
+  "procedure" T_id '(' args ')' {$$ = new Function($2,$4,new Type("void"));}
+| "function" T_id '(' args ')' ':' type {$$ = new Function($2,$4,$6);}
 ;
 
 args:
@@ -163,22 +156,22 @@ stmt:
 ;
 
 expr:
-  l_value
-| r_value
+  l_value {$$ = $1;}
+| r_value {$$ = $1;}
 
 l_value_ref:
   T_id; {$$ = new Id($1);}
 | "result" {/*TODO*/}
-| T_sconst {/*TODO*/}
-| l_value_ref '[' expr ']' %prec BRACKETS {/*TODO*/}
+| T_sconst {$1}}
+| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new BinOp("[]",$1,$3);}
 | '(' l_value ')' {$$ = $2;}
 
 l_value:
-  expr '^' {$$ = new UnOp($2,$1);}
+  expr '^' {$$ = new UnOp("^",$1);}
 | T_id; {$$ = new Id($1);}
 | "result" {/*TODO*/}
-| T_sconst {/*TODO*/}
-| l_value '[' expr ']' %prec BRACKETS {/*TODO*/}
+| T_sconst {$1}
+| l_value '[' expr ']' %prec BRACKETS {$$ = new BinOp("[]",$1,$3);}
 | '(' l_value ')'{$$ = $2;}
 ;
 
@@ -191,24 +184,24 @@ r_value:
 | '(' r_value ')' {$$ = $2;}
 | "nil" {$$ = $1;}
 | call {$$ = $1;}
-| '@' l_value_ref {$$ = new UnOp($1, $2);}
-| expr '+' expr {$$ = new BinOp($1,$2,$3);}
-| expr '-' expr {$$ = new BinOp($1,$2,$3);}
-| expr '*' expr {$$ = new BinOp($1,$2,$3);}
-| expr '/' expr {$$ = new BinOp($1,$2,$3);}
+| '@' l_value_ref {$$ = new UnOp("@", $2);}
+| expr '+' expr {$$ = new BinOp($1,"+",$3);}
+| expr '-' expr {$$ = new BinOp($1,"-",$3);}
+| expr '*' expr {$$ = new BinOp($1,"*",$3);}
+| expr '/' expr {$$ = new BinOp($1,"/",$3);}
 | expr "<>" expr {$$ = new BinOp($1,$2,$3);}
 | expr "<=" expr {$$ = new BinOp($1,$2,$3);}
 | expr ">=" expr {$$ = new BinOp($1,$2,$3);}
-| expr '=' expr {$$ = new BinOp($1,$2,$3);}
-| expr '>' expr {$$ = new BinOp($1,$2,$3);}
-| expr '<' expr {$$ = new BinOp($1,$2,$3);}
+| expr '=' expr {$$ = new BinOp($1,"=",$3);}
+| expr '>' expr {$$ = new BinOp($1,">",$3);}
+| expr '<' expr {$$ = new BinOp($1,"<",$3);}
 | expr "div" expr {$$ = new BinOp($1,$2,$3);}
 | expr "mod" expr {$$ = new BinOp($1,$2,$3);}
 | expr "and" expr {$$ = new BinOp($1,$2,$3);}
 | expr "or" expr {$$ = new BinOp($1,$2,$3);}
 | "not" expr {$$ = new UnOp($1,$2);}
-| '+' expr %prec UPLUS {$$ = new UnOp($1,$2);}
-| '-' expr %prec UMINUS {$$ = new UnOp($1,$2);}
+| '+' expr %prec UPLUS {$$ = new UnOp("+",$2);}
+| '-' expr %prec UMINUS {$$ = new UnOp("-",$2);}
 ;
 
 call:
