@@ -61,16 +61,15 @@
 %nonassoc '@'
 %nonassoc BRACKETS
 
-
-%type<Block*> program block mult_stmts mult_ids mult_exprs mult_formals
-%type<Stmt*>  stmt
-%type<Expr*>  expr
-
+%type<Block*> program body mult_locals local var_decl mult_ids header args mult_formals formal block mult_stmts params mult_exprs
+%type<Stmt*> stmt
+%type<Expr*> expr l_value_ref l_value r_value call
+%type<Type*> type
 
 %%
 
 program:
-  "program" T_id ';' body '.' {$4->name($2); $$=$4;}
+  "program" T_id ';' body '.' {$$ = new Program($2,$4);}
 ;
 
 body:
@@ -134,25 +133,25 @@ block:
 ;
 
 mult_stmts:
-  stmt {$$ = $1;}
+  stmt {$$ = new CommandBlock($1);}
 | mult_stmts ';' stmt { $1->append_stmt($3);}
 ;
 
 stmt:
-
+/*nothing*/ {$$ = new Stmt();}
 | l_value ":=" expr {$$ = new Let($1,$3);}
-| block {$$=$1;}
-| call {$$=$1;}
+| block {$$=Stmt($1);}
+| call {$$=Stmt($1); /*call can be a statement only if it is a proc call*/}
 | "if" expr "then" stmt "else" stmt {$$ = new If($2,$4,$6);}
-| "if" expr "then" stmt {$$ = new If($2,$4,null);}
+| "if" expr "then" stmt {$$ = new If($2,$4);}
 | "while" expr "do" stmt {$$ = new While($2, $4);}
-| T_id ':' stmt { /*lookup label entry point */ $$ = $3; }
+| T_id ':' stmt { $3->target($1); $$=$3 }
 | "goto" T_id { $$ = new Goto($2); }
 | "return" {$$ = new Return();}
-| "new" '[' expr ']' l_value {$$ = new NewArr($5,$3);}
-| "new" l_value {$$=new NewVar($2);}
-| "dispose" '[' ']' l_value {$$ = new DisposeArr($4);}
-| "dispose" l_value {$$ = new DisposeVar($2);}
+| "new" '[' expr ']' l_value {$$ = new New($5,$3);}
+| "new" l_value {$$=new New($2);}
+| "dispose" '[' ']' l_value {$$ = new Dispose($4);}
+| "dispose" l_value {$$ = new Dispose($2);}
 ;
 
 expr:
@@ -161,47 +160,47 @@ expr:
 
 l_value_ref:
   T_id; {$$ = new Id($1);}
-| "result" {/*TODO*/}
-| T_sconst {$1}}
-| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new BinOp("[]",$1,$3);}
+| "result" {$$ = new Id("result");}
+| T_sconst {$$ = new Sconst($1);}
+| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
 | '(' l_value ')' {$$ = $2;}
 
 l_value:
-  expr '^' {$$ = new UnOp("^",$1);}
+  expr '^' {$$ = new Op("^",$1);}
 | T_id; {$$ = new Id($1);}
-| "result" {/*TODO*/}
-| T_sconst {$1}
-| l_value '[' expr ']' %prec BRACKETS {$$ = new BinOp("[]",$1,$3);}
+| "result" {$$ = new Id("result");}
+| T_sconst {$$ = new Sconst($1);}
+| l_value '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
 | '(' l_value ')'{$$ = $2;}
 ;
 
 r_value:
-  T_rconst {$$ = $1;}
-| T_iconst {$$ = $1;}
-| T_cconst {$$ = $1;}
-| "true" {$$ = $1;}
-| "false" {$$ = $1;}
+  T_rconst {$$ = new Rconst($1);}
+| T_iconst {$$ = new Iconst($1);}
+| T_cconst {$$ = new Cconst($1);}
+| "true" {$$ = new Bconst("true");}
+| "false" {$$ = new Bconst("false");}
 | '(' r_value ')' {$$ = $2;}
-| "nil" {$$ = $1;}
+| "nil" {$$ = Pconst("nil"); /*pointer constant*/}
 | call {$$ = $1;}
-| '@' l_value_ref {$$ = new UnOp("@", $2);}
-| expr '+' expr {$$ = new BinOp($1,"+",$3);}
-| expr '-' expr {$$ = new BinOp($1,"-",$3);}
-| expr '*' expr {$$ = new BinOp($1,"*",$3);}
-| expr '/' expr {$$ = new BinOp($1,"/",$3);}
-| expr "<>" expr {$$ = new BinOp($1,$2,$3);}
-| expr "<=" expr {$$ = new BinOp($1,$2,$3);}
-| expr ">=" expr {$$ = new BinOp($1,$2,$3);}
-| expr '=' expr {$$ = new BinOp($1,"=",$3);}
-| expr '>' expr {$$ = new BinOp($1,">",$3);}
-| expr '<' expr {$$ = new BinOp($1,"<",$3);}
-| expr "div" expr {$$ = new BinOp($1,$2,$3);}
-| expr "mod" expr {$$ = new BinOp($1,$2,$3);}
-| expr "and" expr {$$ = new BinOp($1,$2,$3);}
-| expr "or" expr {$$ = new BinOp($1,$2,$3);}
-| "not" expr {$$ = new UnOp($1,$2);}
-| '+' expr %prec UPLUS {$$ = new UnOp("+",$2);}
-| '-' expr %prec UMINUS {$$ = new UnOp("-",$2);}
+| '@' l_value_ref {$$ = new Op("@", $2);}
+| expr '+' expr {$$ = new Op($1,"+",$3);}
+| expr '-' expr {$$ = new Op($1,"-",$3);}
+| expr '*' expr {$$ = new Op($1,"*",$3);}
+| expr '/' expr {$$ = new Op($1,"/",$3);}
+| expr "<>" expr {$$ = new Op($1,"<>",$3);}
+| expr "<=" expr {$$ = new Op($1,"<=",$3);}
+| expr ">=" expr {$$ = new Op($1,">=",$3);}
+| expr '=' expr {$$ = new Op($1,"=",$3);}
+| expr '>' expr {$$ = new Op($1,">",$3);}
+| expr '<' expr {$$ = new Op($1,"<",$3);}
+| expr "div" expr {$$ = new Op($1,"div",$3);}
+| expr "mod" expr {$$ = new Op($1,"mod",$3);}
+| expr "and" expr {$$ = new Op($1,"and",$3);}
+| expr "or" expr {$$ = new Op($1,"or",$3);}
+| "not" expr {$$ = new Op("not",$2);}
+| '+' expr %prec UPLUS {$$ = new Op("+",$2);}
+| '-' expr %prec UMINUS {$$ = new Op("-",$2);}
 ;
 
 call:
