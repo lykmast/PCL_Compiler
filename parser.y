@@ -3,6 +3,7 @@
 #include "pcl_lexer.hpp"
 #include "ast.hpp"
 #include <string>
+
 %}
 
 %define parse.error verbose
@@ -61,7 +62,8 @@
 %nonassoc '@'
 %nonassoc BRACKETS
 
-%type<Block*> program body mult_locals local var_decl mult_ids header args mult_formals formal block mult_stmts params mult_exprs
+%type<Block*> program body mult_locals local var_decl mult_ids header args mult_formals formal block mult_stmts
+%type<List*>  params mult_exprs
 %type<Stmt*> stmt
 %type<Expr*> expr l_value_ref l_value r_value call
 %type<Type*> type
@@ -69,7 +71,7 @@
 %%
 
 program:
-  "program" T_id ';' body '.' {$$ = new Program($2,$4);}
+  "program" T_id ';' body '.' {$$=$4; /*TODO $$ = new Program($2,$4);*/}
 ;
 
 body:
@@ -89,23 +91,23 @@ local:
 ;
 
 var_decl:
-  mult_ids ':' type ';' {$1->type($3); $$ = $1;}
-| var_decl ';' mult_ids ':' type {$1->append_decl($2); $1->type($3); $$=$1;}
+  mult_ids ':' type ';' {$1->set_type($3); $$ = $1;}
+| var_decl ';' mult_ids ':' type {$1->append_decl($2); $1->set_type($3); $$=$1;}
 ;
 
 mult_ids:
-  T_id {$$ = new Decl($1);}
-| mult_ids ',' T_id {$1->append_id($3);}
+  T_id {$$ = new List<Decl*>($1);}
+| mult_ids ',' T_id {$1->append_id($3); $$=$1;}
 ;
 
 type:
-  "integer" {$$=new Type("integer");}
-| "real"  {$$ = new Type("real");}
-| "boolean" {$$ = new Type("boolean");}
-| "char" {$$ = new Type("char");}
-| "array" '[' T_iconst ']' "of" type {$$ = new Type("array",$3,$6);}
-| "array" "of" type {$$ = new Type("array",$3);}
-| '^' type {$$ = new Type("pointer",$2);}
+  "integer" {$$=new Type("integer");/*TODO Singleton type*/}
+| "real"  {$$ = new Type("real"); /*TODO Singleton type*/}
+| "boolean" {$$ = new Type("boolean"); /*TODO Singleton type*/}
+| "char" {$$ = new Type("char"); /*TODO Singleton type*/}
+| "array" '[' T_iconst ']' "of" type {$$ = new ArrType($3,$6);}
+| "array" "of" type {$$ = new ArrType($3);}
+| '^' type {$$ = new PtrType($2);}
 ;
 
 header:
@@ -124,8 +126,8 @@ mult_formals:
 ;
 
 formal:
-  "var" mult_ids ':' type {$2->type($4); $$=$2;}
-| mult_ids ':' type {$1->type($3); $$ = $1;}
+  "var" mult_ids ':' type {$2->set_type($4); $$=$2;}
+| mult_ids ':' type {$1->set_type($3); $$ = $1;}
 ;
 
 block:
@@ -140,18 +142,18 @@ mult_stmts:
 stmt:
 /*nothing*/ {$$ = new Stmt();}
 | l_value ":=" expr {$$ = new Let($1,$3);}
-| block {$$=Stmt($1);}
-| call {$$=Stmt($1); /*call can be a statement only if it is a proc call*/}
+| block {$$= new Stmt();/*TODO $$ = new Stmt($1);*/}
+| call {$$= new Stmt();/*TODO $$= new Stmt($1);*/ /*call can be a statement only if it is a proc call*/}
 | "if" expr "then" stmt "else" stmt {$$ = new If($2,$4,$6);}
-| "if" expr "then" stmt {$$ = new If($2,$4);}
+| "if" expr "then" stmt {$$ = new If($2,$4,nullptr);}
 | "while" expr "do" stmt {$$ = new While($2, $4);}
-| T_id ':' stmt { $3->target($1); $$=$3 }
-| "goto" T_id { $$ = new Goto($2); }
-| "return" {$$ = new Return();}
-| "new" '[' expr ']' l_value {$$ = new New($5,$3);}
-| "new" l_value {$$=new New($2);}
-| "dispose" '[' ']' l_value {$$ = new Dispose($4);}
-| "dispose" l_value {$$ = new Dispose($2);}
+| T_id ':' stmt { $$=$3;/*TODO $3->target($1); $$=$3; */}
+| "goto" T_id { $$=new Stmt();/*TODO $$ = new Goto($2);*/ }
+| "return" {$$=new Stmt();/*TODO $$ = new Return();*/}
+| "new" '[' expr ']' l_value {$$=new Stmt();/*TODO $$ = new New($5,$3);*/}
+| "new" l_value {$$=new Stmt();/*TODO $$=new New($2);*/}
+| "dispose" '[' ']' l_value {$$=new Stmt();/*TODO $$ = new Dispose($4);*/}
+| "dispose" l_value {$$=new Stmt();/*TODO $$ = new Dispose($2);*/}
 ;
 
 expr:
@@ -162,15 +164,15 @@ l_value_ref:
   T_id; {$$ = new Id($1);}
 | "result" {$$ = new Id("result");}
 | T_sconst {$$ = new Sconst($1);}
-| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
+| l_value_ref '[' expr ']' %prec BRACKETS {$$=new Id("TEMP");/*TODO $$ = new Op("[]",$1,$3);*/}
 | '(' l_value ')' {$$ = $2;}
 
 l_value:
-  expr '^' {$$ = new Op("^",$1);}
+  expr '^' {$$=new Id("TEMP");/*TODO $$ = new Op("^",$1);**/}
 | T_id; {$$ = new Id($1);}
 | "result" {$$ = new Id("result");}
 | T_sconst {$$ = new Sconst($1);}
-| l_value '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
+| l_value '[' expr ']' %prec BRACKETS {$$=new Id("TEMP");/*TODO $$ = new Op("[]",$1,$3);*/}
 | '(' l_value ')'{$$ = $2;}
 ;
 
@@ -204,16 +206,16 @@ r_value:
 ;
 
 call:
-  T_id '('params')' {$$ = new Call($1,$3);}
+  T_id '('params')' {$$=new IConst(0);/*TODO $$ = new Call($1,$3);*/}
 ;
 
 params:
-/* nothing */ { $$ = new Param();}
+/* nothing */ { $$ = new ExprList();}
 |mult_exprs {$$ = $1}
 ;
 
 mult_exprs:
-  expr {$$ = new Param($1);}
+  expr {$$ = new ExprList($1);}
 | mult_exprs ',' expr { $1->append($3); $$ = $1;}
 ;
 
