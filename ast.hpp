@@ -13,6 +13,12 @@ union value{
   char* s;
 };
 
+template <class T>
+class Triplet{
+public:
+  T* first,*second,*third;
+}
+
 class AST {
 public:
   virtual ~AST() {}
@@ -278,59 +284,420 @@ public:
     else  out << op << "(" << *left << ")";
   }
 
-  Type* typecheck(){
-  //returns type* of result or nullptr if types are invalid and evaluates
+  Triplet<Type> typecheck(){
+  // returns type* of result or nullptr if types are invalid and evaluates
   // left and right to Consts
     Type* intType=INTEGER::getInstance->get_type();
     Type* realType=REAL::getInstance->getType();
+    Type* boolType=BOOLEAN::getInstance->getType();
     Const *leftConst=left->eval()
-    Const *rightCosnt=right->eval();
     Type *leftType=leftConst->get_type();
-    Type *rightType=rightConst->get_type();
     Type *ret_type=nullptr;
 
     if(right!=nullptr){//BinOps
+      Const *rightCosnt=right->eval();
+      Type *rightType=rightConst->get_type();
       if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
       //real or int operands-> real or int result
-        if(left->)
+        if( (leftType->doCompare(realType) or leftType->doCompare(intType))
+        and (rightType->doCompare(realType) or rightType->doCompare(intType)) ){
+        //is a number (real or int)
+          if(leftType->doCompare(realType) or rightType->doCompare(realType))
+          // one of them is real
+            ret_type=realType;
+          else
+            ret_type=intType;
+        }
       }
-    }
-    if( (leftType->doCompare(realType) or leftType->doCompare(intType))
-    and (rightType->doCompare(realType) or rightType->doCompare(intType)) ){
-    //is a number (real or int)
-      if(leftType->doCompare(realType) or rightType->doCompare(realType))
-      // one of them is real
-        ret_type=realType;
-      else
-        ret_type=intType;
 
+      if(!(op.compare("/"))){
+      //real or int operands-> real result
+        if( (leftType->doCompare(realType) or leftType->doCompare(intType))
+        and (rightType->doCompare(realType) or rightType->doCompare(intType))
+        //is a number (real or int)
+          ret_type=realType;
+      }
+
+      if(!(op.compare("div")) or !(op.compare("mod")) ){
+      //int operands-> int result
+        if(  leftType->doCompare(intType) and rightType->doCompare(intType))
+        //is int
+          ret_type=intType;
+      }
+
+      if(!(op.compare("=")) or !(op.compare("<>")) or !(op.compare("<="))
+      or !(op.compare(">=")) or !(op.compare("<")) or !(op.compare(">")) ){
+      //real or int operands-> bool result
+
+        if( (leftType->doCompare(realType) or leftType->doCompare(intType))
+        and (rightType->doCompare(realType) or rightType->doCompare(intType))
+        //is a number (real or int)
+          ret_type=boolType;
+      }
+
+      if(!(op.compare("and")) or !(op.compare("or")) ){
+      //bool operands-> bool result
+        if(  leftType->doCompare(boolType) and rightType->doCompare(boolType))
+        //is bool
+          ret_type=boolType;
+      }
+
+      delete left;
+      left=leftConst;
+      delete right;
+      right=rightConst;
+      Triplet<Type> t;
+      t.first=ret_type; t.second=leftType; t.third=rightType;
+      return t;
     }
+    //UNOP
+    if(!(op.compare("+")) or !(op.compare("-"))) {
+      //real or int operand-> real or int result
+      if( leftType->doCompare(realType) or leftType->doCompare(intType) )
+        ret_type=leftType;
+
+    if(!(op.compare("not"))){
+      //bool operand-> bool result
+      if(leftType->doCompare(boolType) )
+        ret_type=boolType;
+    }
+
     delete left;
-    delete right;
     left=leftConst;
-    right=rightConst;
+    Triplet<Type> t;
+    t.first=ret_type; t.second=leftType; t.third=nullptr;
+    return t;
+    //TODO @ and ^ operators typecheck
   }
 
   virtual Const* eval() override {
 
-    if(!(op.compare("+")) and right){
+    Type* intType=INTEGER::getInstance->get_type();
+    Type* realType=REAL::getInstance->getType();
+    Type* boolType=BOOLEAN::getInstance->getType();
+    Triplet<Type> t=typecheck();
+    Type* res_type=t.first;
+    Type* leftType=t.second;
+    Type* rightType=t.third;
+    if(!res_type){;/*TODO ERROR*/}
 
+    if(!(op.compare("+")) and right){
+      //BinOp
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      if(resType->doCompare(realType)){
+        return new Rconst(li+ri+lr+rr);
+      }
+      else{
+        return new Iconst(li+ri);
+      }
     }
-    if(!(op.compare("+")))return left->eval(); //UnOp
-    if(!(op.compare("-")) and right) return left->eval() - right->eval();
-    if(!(op.compare("-"))) return (-left->eval()); //UnOp
-    if(!(op.compare("*"))) return left->eval() * right->eval();
-    if(!(op.compare("/")) or !(op.compare("div"))) return left->eval() / right->eval();
-    if(!(op.compare("mod"))) return left->eval() % right->eval();
-    if(!(op.compare("<>"))) return left->eval() != right->eval();
-    if(!(op.compare("<="))) return left->eval() <= right->eval();
-    if(!(op.compare(">="))) return left->eval() >= right->eval();
-    if(!(op.compare("="))) return left->eval() == right->eval();
-    if(!(op.compare(">"))) return left->eval() > right->eval();
-    if(!(op.compare("<"))) return left->eval() < right->eval();
-    if(!(op.compare("and"))) return left->eval() and right->eval();
-    if(!(op.compare("or"))) return left->eval() or right->eval();
-    if(!(op.compare("not"))) return not left->eval();
+    if(!(op.compare("+"))){
+      //UnOp
+      int li=0;
+      double lr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(resType->doCompare(realType)){
+        return new Rconst(li+lr);
+      }
+      else{
+        return new Iconst(li);
+      }
+    }
+    if(!(op.compare("-")) and right) {
+    //BinOp
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      if(resType->doCompare(realType)){
+        return new Rconst(li-ri+lr-rr);
+      }
+      else{
+        return new Iconst(li-ri);
+      }
+    }
+    if(!(op.compare("-"))){
+      //UnOp
+      int li=0;
+      double lr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(resType->doCompare(realType)){
+        return new Rconst(-li-lr);
+      }
+      else{
+        return new Iconst(-li);
+      }
+    }
+    if(!(op.compare("*"))) {
+    //BinOp
+      int li=1,ri=1;
+      double lr=1,rr=1;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      if(resType->doCompare(realType)){
+        return new Rconst(li*ri*lr*rr);
+      }
+      else{
+        return new Iconst(li*ri);
+      }
+    }
+    if(!(op.compare("/"))){
+      int li=1,ri=1;
+      double lr=1,rr=1;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      if(resType->doCompare(realType)){
+        return new Rconst(li/ri*lr/rr);
+      }
+    }
+
+    if( !(op.compare("div"))){
+      value v=left->get_value();
+      int li=v.i;
+      v=right->get_value();
+      int ri=v.i;
+      return new Iconst(li/ri);
+    }
+    if(!(op.compare("mod"))) {
+      value v=left->get_value();
+      int li=v.i;
+      v=right->get_value();
+      int ri=v.i;
+      return new Iconst(li%ri);
+    }
+    if(!(op.compare("<>"))) {
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      return new Bconst(li+lr!=ri+rr);
+    }
+    if(!(op.compare("<="))) {
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      return new Bconst(li+lr<=ri+rr);
+    }
+    if(!(op.compare(">="))) {
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      return new Bconst(li+lr>=ri+rr);
+    }
+    if(!(op.compare("="))) {
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      return new Bconst(li+lr==ri+rr);
+    }
+    if(!(op.compare(">"))) {
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      return new Bconst(li+lr > ri+rr);
+    };
+    if(!(op.compare("<"))) {
+      int li=0,ri=0;
+      double lr=0,rr=0;
+      value v;
+      if(leftType->doCompare(realType)){
+        v=left->get_value()
+        lr=v.r;
+      }
+      else{
+        v=left->get_value()
+        li=v.i;
+      }
+      if(rightType->doCompare(realType)){
+        v=right->get_value()
+        rr=v.r;
+      }
+      else{
+        v=right->get_value()
+        ri=v.i;
+      }
+      return new Bconst(li+lr < ri+rr);
+    }
+    if(!(op.compare("and"))) {
+      value v=left->get_value();
+      bool lb=v.b;
+      v=right->get_value();
+      bool rb=v.b;
+      return new Bconst(lb and rb);
+    }
+    if(!(op.compare("or"))) {
+      value v=left->get_value();
+      bool lb=v.b;
+      v=right->get_value();
+      bool rb=v.b;
+      return new Bconst(lb or rb);
+    }
+    if(!(op.compare("not"))) {
+      //UnOp
+
+      value v;
+      v=left->get_value()
+      bool lb=v.b;
+      return new Rconst(not lb);
+    }
     if(!(op.compare("@"))) return left->eval(); //TODO reference
     if(!(op.compare("^"))) return left->eval(); //TODO dereference
     if(!(op.compare("[]"))) return left->eval(); //TODO array index

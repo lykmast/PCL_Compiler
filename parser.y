@@ -206,7 +206,7 @@ r_value:
 ;
 
 call:
-  T_id '('params')' {$$=new IConst(0);/*TODO $$ = new Call($1,$3);*/}
+  T_id '('params')' {$$=new Iconst(0);/*TODO $$ = new Call($1,$3);*/}
 ;
 
 params:
