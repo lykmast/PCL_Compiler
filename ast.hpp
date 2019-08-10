@@ -10,15 +10,8 @@ union value{
   int i;
   double r;
   bool b;
-  std::string s;
-}
-union expr_type{
-  int i;
-  double d;
-  bool b;
-}
-
-extern std::map<std::string, value> globals;
+  char* s;
+};
 
 class AST {
 public:
@@ -27,13 +20,125 @@ public:
 };
 
 inline std::ostream& operator<< (std::ostream &out, const AST &t) {
-  t.printOn(out);
-  return out;
+	t.printOn(out);
+	return out;
 }
+
+class Type: public AST{
+public:
+  Type(std::string t):name(t){}
+  std::string get_name(){
+    return name;
+  }
+  virtual Type* get_type() const{ return nullptr;}
+  virtual void printOn(std::ostream &out) const override {
+    out << "Type(" << name << ")";
+  }
+  virtual bool should_delete() const{//should not delete Singleton
+    return false;
+  }
+  virtual bool doCompare(Type* t){
+    return !(name.compare(t->get_name()));
+  }
+protected:
+  std::string name;
+};
+
+class INTEGER: public Type{
+private:
+  INTEGER():Type("integer"){}  //private constructor to prevent instancing
+public:
+	static INTEGER* getInstance(){
+		static INTEGER instance;
+		return &instance;
+	}
+};
+
+class REAL: public Type{
+private:
+  REAL():Type("real"){}  //private constructor to prevent instancing
+public:
+	static REAL* getInstance(){
+		static REAL instance;
+		return &instance;
+	}
+};
+
+class BOOLEAN: public Type{
+private:
+	BOOLEAN():Type("boolean"){}  //private constructor to prevent instancing
+public:
+	static BOOLEAN* getInstance(){
+		static BOOLEAN instance;
+		return &instance;
+	}
+};
+
+class CHARACTER: public Type{
+private:
+  CHARACTER():Type("character"){}  //private constructor to prevent instancing
+public:
+	static CHARACTER* getInstance(){
+		static CHARACTER instance;
+		return &instance;
+	}
+};
+
+class ANY: public Type{
+private:
+  ANY():Type("any"){}  //private constructor to prevent instancing
+public:
+	static ANY* getInstance(){
+		static ANY instance;
+		return &instance;
+	}
+};
+
+class PtrType: public Type{
+public:
+  PtrType(Type* t):Type("pointer"),type(t){}
+	PtrType(std::string name,Type* t):Type(name),type(t){}
+  ~PtrType(){if(type->should_delete()) delete type;}
+  Type* get_type(){ return type;}
+  virtual void printOn(std::ostream &out) const override {
+    out << "PtrType(" << name <<"of type "<< *type << ")";
+  }
+  virtual bool should_delete() const override{
+    return true;
+  }
+  virtual bool doCompare(Type* t) override{
+    if (!(name.compare(t->get_name)))
+      return type==t->get_type();
+    return false;
+  }
+protected:
+  Type* type;
+};
+
+class ArrType: public PtrType{
+public:
+  ArrType(int s,Type* t):size(s),PtrType("array",t){}
+  ArrType(Type* t):size(-1),PtrType("array",t){}
+  ~ArrType(){if(type->should_delete()) delete type;}
+  int get_size(){return size;}
+  virtual void printOn(std::ostream &out) const override {
+    out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
+  }
+protected:
+  int size;
+};
+
+// const Type * INTEGER=new Type("integer"),* REAL=new Type("real"),
+// *BOOLEAN=new Type("boolean"), CHARACTER=new Type("char");
+
+class Const; //forward declaration of Const to use as eval() return Type
+
+extern std::map<std::string, Const*> globals; // map variable names to values
+
 
 class Expr: public AST {
 public:
-  virtual expr_type eval() const = 0;
+  virtual Const* eval() = 0;
 };
 
 class Stmt: public AST {
@@ -48,7 +153,7 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "Id(" << var << ")";
   }
-  virtual value eval() const override {
+  virtual Const* eval() override {
     return globals[var];
   }
   std::string name(){
@@ -60,92 +165,106 @@ private:
 
 class Const: public Expr{
 public:
-  std::string get_type(){return type;}
+  Const(Type* ty):type(ty){}
+  Type* get_type(){return type;}
+  virtual void printOn(std::ostream &out) const =0;
+	virtual Const* eval() override{return this;}
+  virtual value get_value() const=0;
 protected:
   Type* type;
 };
-class SConst: public Const {
+
+class Sconst: public Const {
 public:
-  SConst(std::string s):type(new ArrType(s.size()+1,new Type("character"))){
-    str=malloc(sizeof(char)*(s.size()+1));
-    s.copy(str,s.size());
+  Sconst(std::string s):Const(new ArrType(s.size()+1,CHARACTER::getInstance())) {
+    str=(char*)(malloc(sizeof(char)*(s.size()-1)));
+    s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
     str[s.size()]='\0';
   }
   virtual void printOn(std::ostream &out) const override {
-    out << "SConst(" << str << ")";
+    out << "Sconst(" << str << ")";
   }
-  virtual char* eval() const override {
-    return str;
+  virtual value get_value() const override {
+    value v; v.s=str;
+    return v;
   }
 private:
   char *str;
 };
 
-class IConst: public Const {
+class Iconst: public Const {
 public:
-  IConst(int n):num(n){}
+  Iconst(int n):Const(INTEGER::getInstance()),num(n){}
   virtual void printOn(std::ostream &out) const override {
-    out << "IConst(" << num << ")";
+    out << "Iconst(" << num << ")";
   }
-  virtual int eval() const override {
-    return num;
+  virtual value get_value() const override {
+    value v; v.i=num;
+    return v;
   }
 private:
   int num;
 };
 
-class DConst: public Const {
+
+class Rconst: public Const {
 public:
-  IConst(double n):num(n){}
+  Rconst(double n):Const(REAL::getInstance()),num(n){}
   virtual void printOn(std::ostream &out) const override {
-    out << "DConst(" << num << ")";
+    out << "Rconst(" << num << ")";
   }
-  virtual double eval() const override {
-    return num;
+  virtual value get_value() const override {
+    value v; v.r=num;
+    return v;
   }
 private:
-  int num;
+  double num;
 };
 
-class CConst: public Const {
+class Cconst: public Const {
 public:
-  CConst(char c):ch(c){}
+  Cconst(char c):Const(CHARACTER::getInstance()),ch(c){}
   virtual void printOn(std::ostream &out) const override {
-    out << "CConst(" << ch << ")";
+    out << "Cconst(" << ch << ")";
   }
-  virtual char eval() const override {
-    return ch;
+  virtual value get_value() const override {
+    value v; v.c=ch;
+    return v;
   }
 private:
   char ch;
 };
 
-class CConst: public Const {
+class Pconst: public Const {
 public:
-  CConst(std::string p):ptr(0){}
+  Pconst():Const(new PtrType(ANY::getInstance())),ptr(0){}//TODO implement for pointers different than nil
+	Pconst(int pval,Type *t):Const(t),ptr(pval){}
   virtual void printOn(std::ostream &out) const override {
-    out << "PConst(" << ptr << ")";
+    out << "Pconst(" << ptr << "of type "<<*type<< ")";
   }
-  virtual char eval() const override {
-    return ptr;
+  virtual value get_value() const override {
+    value v; v.i=ptr;
+    return v;
   }
 private:
   int ptr;
 };
 
-class BConst: public Const {
+class Bconst: public Const {
 public:
-  BConst(str::string b){
+  Bconst(std::string b):Const(BOOLEAN::getInstance()){
     if(!(c.compare("true"))) boo=true;
     else boo=false;
   }
   virtual void printOn(std::ostream &out) const override {
-    out << "BConst(" << boo << ")";
+    out << "Bconst(" << boo << ")";
   }
-  virtual char eval() const override {
-    return boo;
+  virtual value get_value() const override {
+    value v; v.b=boo;
+    return v;
   }
 private:
+
   bool boo;
 };
 
@@ -158,8 +277,45 @@ public:
     if(right) out << op << "(" << *left << ", " << *right << ")";
     else  out << op << "(" << *left << ")";
   }
-  virtual expr_type eval() const override {
-    if(!(op.compare("+")) and right)return left->eval() + right->eval();
+
+  Type* typecheck(){
+  //returns type* of result or nullptr if types are invalid and evaluates
+  // left and right to Consts
+    Type* intType=INTEGER::getInstance->get_type();
+    Type* realType=REAL::getInstance->getType();
+    Const *leftConst=left->eval()
+    Const *rightCosnt=right->eval();
+    Type *leftType=leftConst->get_type();
+    Type *rightType=rightConst->get_type();
+    Type *ret_type=nullptr;
+
+    if(right!=nullptr){//BinOps
+      if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
+      //real or int operands-> real or int result
+        if(left->)
+      }
+    }
+    if( (leftType->doCompare(realType) or leftType->doCompare(intType))
+    and (rightType->doCompare(realType) or rightType->doCompare(intType)) ){
+    //is a number (real or int)
+      if(leftType->doCompare(realType) or rightType->doCompare(realType))
+      // one of them is real
+        ret_type=realType;
+      else
+        ret_type=intType;
+
+    }
+    delete left;
+    delete right;
+    left=leftConst;
+    right=rightConst;
+  }
+
+  virtual Const* eval() override {
+
+    if(!(op.compare("+")) and right){
+
+    }
     if(!(op.compare("+")))return left->eval(); //UnOp
     if(!(op.compare("-")) and right) return left->eval() - right->eval();
     if(!(op.compare("-"))) return (-left->eval()); //UnOp
@@ -206,9 +362,9 @@ public:
   If(Expr* e,Stmt* s1, Stmt* s2):expr(e),stmt1(s1),stmt2(s2){}
   virtual void printOn(std::ostream &out) const override {
     if (stmt2)
-      out << "If(" << *expr << "then" << *stmt1 << "else" << *stmt2 << ")";
+    out << "If(" << *expr << "then" << *stmt1 << "else" << *stmt2 << ")";
     else
-      out << "If(" << *expr << "then" << *stmt1 << ")";
+    out << "If(" << *expr << "then" << *stmt1 << ")";
   }
   virtual void run() const override{
     if(expr->eval()) stmt1->run();
@@ -235,8 +391,8 @@ private:
 template<class T>
 std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) const{
   for(auto p :v)
-    out<<*p<<",";
-    return out;
+  out<<*p<<",";
+  return out;
 }
 
 template <class T>
@@ -245,7 +401,7 @@ public:
   List(T *t):list(1,t){}
   ~List(){
     for(auto p:list)
-      delete p;
+    delete p;
     list.clear();
   }
   virtual void printOn(std::ostream &out) const override {
@@ -263,7 +419,7 @@ class ExprList: public List<Expr* > {
   ExprList(Expr *e):list(1,e){}
   ~ExprList(){
     for(auto p:list)
-      delete p;
+    delete p;
     list.clear();
   }
   virtual void printOn(std::ostream &out) const override {
@@ -276,50 +432,13 @@ class ExprList: public List<Expr* > {
     std::vector<ValueType*> ret;
     ValueType *v;
     for(auto p:list)
-      v=p->eval();
-      ret.push_back(v);
+    v=p->eval();
+    ret.push_back(v);
   }
 private:
   std::vector<Expr*> list;
 };
 
-class Type: public AST{
-public:
-  Type(std::string t):name(t){}
-  std::string get_name(){
-    return name;
-  }
-  virtual void printOn(std::ostream &out) const override {
-    out << "Type(" << name << ")";
-  }
-protected:
-  std::string name;
-};
-
-class PtrType: public Type{
-public:
-  PtrType(Type* t):name("pointer"),type(t){}
-  ~PtrType(){delete type;}
-  Type* get_type(){ return type;}
-  virtual void printOn(std::ostream &out) const override {
-    out << "PtrType(" << name <<"of type "<< *type << ")";
-  }
-protected:
-  Type* type;
-}
-
-class ArrType: public PtrType{
-public:
-  ArrType(int s,Type* t):size(s),name("array"),type(t){}
-  ArrType(Type* t):size(-1),name("array"),type(t){}
-  ~ArrType(){delete type;}
-  int get_size(){return size;}
-  virtual void printOn(std::ostream &out) const override {
-    out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
-  }
-protected:
-  int size;
-}
 
 class Local: public AST{
 
@@ -347,14 +466,15 @@ class VarDecl: public Decl{
   VarDecl(Decl* d,Type* t):id(d->get_id),decl_type("var"),type(t){delete d;}
   virtual void printOn(std::ostream &out) const override {
     if(type)
-      out << "VarDecl(" <<id<<"of type "<< *type << ")";
+    out << "VarDecl(" <<id<<"of type "<< *type << ")";
     else
-      out << "VarDecl(" <<id<<"of type NOTSET)";
+    out << "VarDecl(" <<id<<"of type NOTSET)";
   }
   void set_type(Type* ty){type=ty;}
 protected:
   Type* type;
 };
+
 
 
 class Body: public AST{

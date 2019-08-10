@@ -101,10 +101,10 @@ mult_ids:
 ;
 
 type:
-  "integer" {$$=new Type("integer");/*TODO Singleton type*/}
-| "real"  {$$ = new Type("real"); /*TODO Singleton type*/}
-| "boolean" {$$ = new Type("boolean"); /*TODO Singleton type*/}
-| "char" {$$ = new Type("char"); /*TODO Singleton type*/}
+  "integer" {$$=INTEGER::getInstance();}
+| "real"  {$$ = REAL::getInstance(); }
+| "boolean" {$$ =BOOLEAN::getInstance(); }
+| "char" {$$ = CHARACTER::getInstance(); }
 | "array" '[' T_iconst ']' "of" type {$$ = new ArrType($3,$6);}
 | "array" "of" type {$$ = new ArrType($3);}
 | '^' type {$$ = new PtrType($2);}
@@ -183,7 +183,7 @@ r_value:
 | "true" {$$ = new Bconst("true");}
 | "false" {$$ = new Bconst("false");}
 | '(' r_value ')' {$$ = $2;}
-| "nil" {$$ = Pconst("nil"); /*pointer constant*/}
+| "nil" {$$ = Pconst(); /*pointer constant*/}
 | call {$$ = $1;}
 | '@' l_value_ref {$$ = new Op("@", $2);}
 | expr '+' expr {$$ = new Op($1,"+",$3);}
