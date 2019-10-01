@@ -145,6 +145,7 @@ extern std::map<std::string, Const*> globals; // map variable names to values
 class Expr: public AST {
 public:
   virtual Const* eval() = 0;
+  virtual void typecheck() const{};
 };
 
 class Stmt: public AST {
@@ -276,7 +277,8 @@ private:
 
 class Op: public Expr {
 public:
-  Op(Expr *l, std::string o, Expr *r): left(l), op(o), right(r) {}
+  Op(Expr *l, std::string o, Expr *r): left(l), op(o), right(r),
+    leftType(nullptr), rightType(nullptr), resType(nullptr) {}
   Op(Expr *l, std::string o): left(l), op(o), right(nullptr) {}
   ~Op() { delete left; delete right; }
   virtual void printOn(std::ostream &out) const override {
@@ -284,19 +286,19 @@ public:
     else  out << op << "(" << *left << ")";
   }
 
-  Triplet<Type> typecheck(){
-  // returns type* of result or nullptr if types are invalid and evaluates
-  // left and right to Consts
+  virtual void typecheck() const override{
+  // sets leftType, rightType and resType fields
+  // it should be run only once even when we have repeated evals
+  // e.g in while
     Type* intType=INTEGER::getInstance();
     Type* realType=REAL::getInstance();
     Type* boolType=BOOLEAN::getInstance();
-    Const *leftConst=left->eval()
-    Type *leftType=leftConst->get_type();
-    Type *ret_type=nullptr;
+    Const *leftConst=left->eval();
+    leftType=leftConst->get_type();
 
     if(right!=nullptr){//BinOps
-      Const *rightCosnt=right->eval();
-      Type *rightType=rightConst->get_type();
+      Const *rightConst=right->eval();
+      rightType=rightConst->get_type();
       if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
       //real or int operands-> real or int result
         if( (leftType->doCompare(realType) or leftType->doCompare(intType))
@@ -304,9 +306,9 @@ public:
         //is a number (real or int)
           if(leftType->doCompare(realType) or rightType->doCompare(realType))
           // one of them is real
-            ret_type=realType;
+            resType=realType;
           else
-            ret_type=intType;
+            resType=intType;
         }
       }
 
@@ -315,14 +317,14 @@ public:
         if( (leftType->doCompare(realType) or leftType->doCompare(intType))
         and (rightType->doCompare(realType) or rightType->doCompare(intType)))
         //is a number (real or int)
-          ret_type=realType;
+          resType=realType;
       }
 
       if(!(op.compare("div")) or !(op.compare("mod")) ){
       //int operands-> int result
         if(  leftType->doCompare(intType) and rightType->doCompare(intType))
         //is int
-          ret_type=intType;
+          resType=intType;
       }
 
       if(!(op.compare("=")) or !(op.compare("<>")) or !(op.compare("<="))
@@ -332,74 +334,66 @@ public:
         if( (leftType->doCompare(realType) or leftType->doCompare(intType))
         and (rightType->doCompare(realType) or rightType->doCompare(intType)))
         //is a number (real or int)
-          ret_type=boolType;
+          resType=boolType;
       }
 
       if(!(op.compare("and")) or !(op.compare("or")) ){
       //bool operands-> bool result
         if(  leftType->doCompare(boolType) and rightType->doCompare(boolType))
         //is bool
-          ret_type=boolType;
+          resType=boolType;
       }
-
-      delete left;
-      left=leftConst;
-      delete right;
-      right=rightConst;
-      Triplet<Type> t;
-      t.first=ret_type; t.second=leftType; t.third=rightType;
-      return t;
+      if(!resType){/*TODO ERROR type mismatch*/}
+      return;
     }
     //UNOP
     if(!(op.compare("+")) or !(op.compare("-")))
       //real or int operand-> real or int result
       if( leftType->doCompare(realType) or leftType->doCompare(intType) )
-        ret_type=leftType;
+        resType=leftType;
 
     if(!(op.compare("not"))){
       //bool operand-> bool result
       if(leftType->doCompare(boolType) )
-        ret_type=boolType;
+        resType=boolType;
     }
 
-    delete left;
-    left=leftConst;
-    Triplet<Type> t;
-    t.first=ret_type; t.second=leftType; t.third=nullptr;
-    return t;
+    if(!resType){/*TODO ERROR type mismatch*/}
+    return;
     //TODO @ and ^ operators typecheck
   }
 
   virtual Const* eval() override {
-
+    // before the first eval of any op, there must have been one typecheck to
+    // fill resType, leftType, rightType
     Type* intType=INTEGER::getInstance();
     Type* realType=REAL::getInstance();
     Type* boolType=BOOLEAN::getInstance();
-    Triplet<Type> t=typecheck();
-    Type* res_type=t.first;
-    Type* leftType=t.second;
-    Type* rightType=t.third;
-    if(!res_type){;/*TODO ERROR*/}
-
+    left->typecheck();
+    Const *leftConst=left->eval();
+    if(right){
+      right->typecheck();
+      Const *rightConst=right->eval();
+    }
     if(!(op.compare("+")) and right){
       //BinOp
       int li=0,ri=0;
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -415,11 +409,11 @@ public:
       double lr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(resType->doCompare(realType)){
@@ -435,19 +429,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -463,11 +457,11 @@ public:
       double lr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(resType->doCompare(realType)){
@@ -483,19 +477,19 @@ public:
       double lr=1,rr=1;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -510,19 +504,19 @@ public:
       double lr=1,rr=1;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -531,16 +525,16 @@ public:
     }
 
     if( !(op.compare("div"))){
-      value v=left->get_value();
+      value v=leftConst->get_value();
       int li=v.i;
-      v=right->get_value();
+      v=rightConst->get_value();
       int ri=v.i;
       return new Iconst(li/ri);
     }
     if(!(op.compare("mod"))) {
-      value v=left->get_value();
+      value v=leftConst->get_value();
       int li=v.i;
-      v=right->get_value();
+      v=rightConst->get_value();
       int ri=v.i;
       return new Iconst(li%ri);
     }
@@ -549,19 +543,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       return new Bconst(li+lr!=ri+rr);
@@ -571,19 +565,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       return new Bconst(li+lr<=ri+rr);
@@ -593,19 +587,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       return new Bconst(li+lr>=ri+rr);
@@ -615,19 +609,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       return new Bconst(li+lr==ri+rr);
@@ -637,19 +631,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       return new Bconst(li+lr > ri+rr);
@@ -659,34 +653,34 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=left->get_value()
+        v=leftConst->get_value()
         lr=v.r;
       }
       else{
-        v=left->get_value()
+        v=leftConst->get_value()
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=right->get_value()
+        v=rightConst->get_value()
         rr=v.r;
       }
       else{
-        v=right->get_value()
+        v=rightConst->get_value()
         ri=v.i;
       }
       return new Bconst(li+lr < ri+rr);
     }
     if(!(op.compare("and"))) {
-      value v=left->get_value();
+      value v=leftConst->get_value();
       bool lb=v.b;
-      v=right->get_value();
+      v=rightConst->get_value();
       bool rb=v.b;
       return new Bconst(lb and rb);
     }
     if(!(op.compare("or"))) {
-      value v=left->get_value();
+      value v=leftConst->get_value();
       bool lb=v.b;
-      v=right->get_value();
+      v=rightConst->get_value();
       bool rb=v.b;
       return new Bconst(lb or rb);
     }
@@ -694,16 +688,17 @@ public:
       //UnOp
 
       value v;
-      v=left->get_value()
+      v=leftConst->get_value()
       bool lb=v.b;
       return new Bconst(not lb);
     }
-    if(!(op.compare("@"))) return left->eval(); //TODO reference
-    if(!(op.compare("^"))) return left->eval(); //TODO dereference
-    if(!(op.compare("[]"))) return left->eval(); //TODO array index
+    if(!(op.compare("@"))) return leftConst->eval(); //TODO reference
+    if(!(op.compare("^"))) return leftConst->eval(); //TODO dereference
+    if(!(op.compare("[]"))) return leftConst->eval(); //TODO array index
     return 0;  // this will never be reached.
   }
 private:
+  Type *leftType,*rightType,*resType;
   Expr *left;
   std::string op;
   Expr *right;
@@ -735,6 +730,7 @@ public:
     out << "If(" << *expr << "then" << *stmt1 << ")";
   }
   virtual void run() const override{
+    expr->typecheck();
     Const * c= expr->eval();
     bool e=false;
     if(c->get_type()==BOOLEAN::getInstance()){
@@ -757,6 +753,7 @@ public:
     out << "While(" << *expr << "do" << *stmt << ")";
   }
   virtual void run() const override{
+    expr->typecheck();
     Const * c= expr->eval();
     bool e=false;
     if(c->get_type()==BOOLEAN::getInstance()){
