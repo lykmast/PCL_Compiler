@@ -182,10 +182,10 @@ protected:
 
 class Sconst: public Const {
 public:
-  Sconst(std::string s):Const(new ArrType(s.size()+1,CHARACTER::getInstance())) {
+  Sconst(std::string s):Const(new ArrType(s.size()-1,CHARACTER::getInstance())) {
     str=(char*)(malloc(sizeof(char)*(s.size()-1)));
     s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
-    str[s.size()]='\0';
+    str[s.size()-2]='\0';
   }
   virtual void printOn(std::ostream &out) const override {
     out << "Sconst(" << str << ")";
@@ -259,7 +259,7 @@ private:
 class Bconst: public Const {
 public:
   Bconst(std::string b):Const(BOOLEAN::getInstance()){
-    if(!(c.compare("true"))) boo=true;
+    if(!(b.compare("true"))) boo=true;
     else boo=false;
   }
   virtual void printOn(std::ostream &out) const override {
@@ -287,9 +287,9 @@ public:
   Triplet<Type> typecheck(){
   // returns type* of result or nullptr if types are invalid and evaluates
   // left and right to Consts
-    Type* intType=INTEGER::getInstance->get_type();
-    Type* realType=REAL::getInstance->getType();
-    Type* boolType=BOOLEAN::getInstance->getType();
+    Type* intType=INTEGER::getInstance();
+    Type* realType=REAL::getInstance();
+    Type* boolType=BOOLEAN::getInstance();
     Const *leftConst=left->eval()
     Type *leftType=leftConst->get_type();
     Type *ret_type=nullptr;
@@ -351,7 +351,7 @@ public:
       return t;
     }
     //UNOP
-    if(!(op.compare("+")) or !(op.compare("-"))) {
+    if(!(op.compare("+")) or !(op.compare("-")))
       //real or int operand-> real or int result
       if( leftType->doCompare(realType) or leftType->doCompare(intType) )
         ret_type=leftType;
@@ -372,9 +372,9 @@ public:
 
   virtual Const* eval() override {
 
-    Type* intType=INTEGER::getInstance->get_type();
-    Type* realType=REAL::getInstance->getType();
-    Type* boolType=BOOLEAN::getInstance->getType();
+    Type* intType=INTEGER::getInstance();
+    Type* realType=REAL::getInstance();
+    Type* boolType=BOOLEAN::getInstance();
     Triplet<Type> t=typecheck();
     Type* res_type=t.first;
     Type* leftType=t.second;
@@ -696,7 +696,7 @@ public:
       value v;
       v=left->get_value()
       bool lb=v.b;
-      return new Rconst(not lb);
+      return new Bconst(not lb);
     }
     if(!(op.compare("@"))) return left->eval(); //TODO reference
     if(!(op.compare("^"))) return left->eval(); //TODO dereference
@@ -717,7 +717,8 @@ public:
     out << "Let(" << *id << ":=" << *expr << ")";
   }
   virtual void run() const override{
-    globals[id->name()]=expr;
+    delete globals[id->name()];
+    globals[id->name()]=expr->eval();
   }
 private:
   Id  *id;
@@ -734,7 +735,14 @@ public:
     out << "If(" << *expr << "then" << *stmt1 << ")";
   }
   virtual void run() const override{
-    if(expr->eval()) stmt1->run();
+    Const * c= expr->eval();
+    bool e=false;
+    if(c->get_type()==BOOLEAN::getInstance()){
+      value v=c.get_value();
+      e = v.b;
+    }
+    else{/*TODO ERROR incorrect type*/}
+    if(b) stmt1->run();
     else if (stmt2) stmt2->run();
   }
 private:
@@ -749,7 +757,23 @@ public:
     out << "While(" << *expr << "do" << *stmt << ")";
   }
   virtual void run() const override{
-    while(expr->eval()) stmt->run();
+    Const * c= expr->eval();
+    bool e=false;
+    if(c->get_type()==BOOLEAN::getInstance()){
+      value v=c.get_value();
+      e = v.b;
+    }
+    else{/*TODO ERROR incorrect type*/}
+    while(b) {
+      stmt->run();
+      Const * c= expr->eval();
+      bool e=false;
+      if(c->get_type()==BOOLEAN::getInstance()){
+        value v=c.get_value();
+        e = v.b;
+      }
+      else{/*TODO ERROR incorrect type*/}
+    }
   }
 private:
   Expr *expr;
@@ -812,7 +836,7 @@ class Local: public AST{
 };
 
 class Decl: public AST{
-  Decl(std::string i,std::string ty)id(i),decl_type("unknown"){}
+  Decl(std::string i,std::string ty):id(i),decl_type("unknown"){}
   virtual void printOn(std::ostream &out) const override {
     out << "Decl(" << decl_type <<":"<<id<<")";
   }
@@ -823,14 +847,14 @@ protected:
 };
 
 class LabelDecl:public Decl{
-  LabelDecl(Decl* d):id(d->get_id),decl_type("label"){delete d;}
+  LabelDecl(Decl* d):id(d->get_id()),decl_type("label"){delete d;}
   virtual void printOn(std::ostream &out) const override {
     out << "LabelDecl("<<id<<")";
   }
 }
 class VarDecl: public Decl{
-  VarDecl(Decl* d):id(d->get_id),decl_type("var"),type(nullptr){delete d;}
-  VarDecl(Decl* d,Type* t):id(d->get_id),decl_type("var"),type(t){delete d;}
+  VarDecl(Decl* d):id(d->get_id()),decl_type("var"),type(nullptr){delete d;}
+  VarDecl(Decl* d,Type* t):id(d->get_id()),decl_type("var"),type(t){delete d;}
   virtual void printOn(std::ostream &out) const override {
     if(type)
     out << "VarDecl(" <<id<<"of type "<< *type << ")";
