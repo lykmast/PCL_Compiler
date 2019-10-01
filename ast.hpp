@@ -313,7 +313,7 @@ public:
       if(!(op.compare("/"))){
       //real or int operands-> real result
         if( (leftType->doCompare(realType) or leftType->doCompare(intType))
-        and (rightType->doCompare(realType) or rightType->doCompare(intType))
+        and (rightType->doCompare(realType) or rightType->doCompare(intType)))
         //is a number (real or int)
           ret_type=realType;
       }
@@ -330,7 +330,7 @@ public:
       //real or int operands-> bool result
 
         if( (leftType->doCompare(realType) or leftType->doCompare(intType))
-        and (rightType->doCompare(realType) or rightType->doCompare(intType))
+        and (rightType->doCompare(realType) or rightType->doCompare(intType)))
         //is a number (real or int)
           ret_type=boolType;
       }
