@@ -17,7 +17,7 @@ template <class T>
 class Triplet{
 public:
   T* first,*second,*third;
-}
+};
 
 class AST {
 public:
@@ -113,7 +113,7 @@ public:
     return true;
   }
   virtual bool doCompare(Type* t) override{
-    if (!(name.compare(t->get_name)))
+    if (!(name.compare(t->get_name())))
       return type==t->get_type();
     return false;
   }
@@ -145,7 +145,7 @@ extern std::map<std::string, Const*> globals; // map variable names to values
 class Expr: public AST {
 public:
   virtual Const* eval() = 0;
-  virtual void typecheck() const{};
+  virtual void typecheck() {};
 };
 
 class Stmt: public AST {
@@ -259,10 +259,7 @@ private:
 
 class Bconst: public Const {
 public:
-  Bconst(std::string b):Const(BOOLEAN::getInstance()){
-    if(!(b.compare("true"))) boo=true;
-    else boo=false;
-  }
+  Bconst(bool b):Const(BOOLEAN::getInstance()),boo(b){}
   virtual void printOn(std::ostream &out) const override {
     out << "Bconst(" << boo << ")";
   }
@@ -286,7 +283,7 @@ public:
     else  out << op << "(" << *left << ")";
   }
 
-  virtual void typecheck() const override{
+  virtual void typecheck() override{
   // sets leftType, rightType and resType fields
   // it should be run only once even when we have repeated evals
   // e.g in while
@@ -371,9 +368,10 @@ public:
     Type* boolType=BOOLEAN::getInstance();
     left->typecheck();
     Const *leftConst=left->eval();
+    Const *rightConst=nullptr;
     if(right){
       right->typecheck();
-      Const *rightConst=right->eval();
+      rightConst=right->eval();
     }
     if(!(op.compare("+")) and right){
       //BinOp
@@ -381,19 +379,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -409,11 +407,11 @@ public:
       double lr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(resType->doCompare(realType)){
@@ -429,19 +427,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -457,11 +455,11 @@ public:
       double lr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(resType->doCompare(realType)){
@@ -477,19 +475,19 @@ public:
       double lr=1,rr=1;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -504,19 +502,19 @@ public:
       double lr=1,rr=1;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       if(resType->doCompare(realType)){
@@ -543,19 +541,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       return new Bconst(li+lr!=ri+rr);
@@ -565,19 +563,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       return new Bconst(li+lr<=ri+rr);
@@ -587,19 +585,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       return new Bconst(li+lr>=ri+rr);
@@ -609,19 +607,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       return new Bconst(li+lr==ri+rr);
@@ -631,19 +629,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       return new Bconst(li+lr > ri+rr);
@@ -653,19 +651,19 @@ public:
       double lr=0,rr=0;
       value v;
       if(leftType->doCompare(realType)){
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         lr=v.r;
       }
       else{
-        v=leftConst->get_value()
+        v=leftConst->get_value();
         li=v.i;
       }
       if(rightType->doCompare(realType)){
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         rr=v.r;
       }
       else{
-        v=rightConst->get_value()
+        v=rightConst->get_value();
         ri=v.i;
       }
       return new Bconst(li+lr < ri+rr);
@@ -688,7 +686,7 @@ public:
       //UnOp
 
       value v;
-      v=leftConst->get_value()
+      v=leftConst->get_value();
       bool lb=v.b;
       return new Bconst(not lb);
     }
@@ -707,7 +705,7 @@ private:
 class Let: public Stmt { //TODO semantics
 public:
   Let(Id* i,Expr* e):id(i),expr(e){}
-  ~Let(){delete id; delete e;}
+  ~Let(){delete id; delete expr;}
   virtual void printOn(std::ostream &out) const override {
     out << "Let(" << *id << ":=" << *expr << ")";
   }
@@ -734,11 +732,11 @@ public:
     Const * c= expr->eval();
     bool e=false;
     if(c->get_type()==BOOLEAN::getInstance()){
-      value v=c.get_value();
+      value v=c->get_value();
       e = v.b;
     }
     else{/*TODO ERROR incorrect type*/}
-    if(b) stmt1->run();
+    if(e) stmt1->run();
     else if (stmt2) stmt2->run();
   }
 private:
@@ -757,16 +755,16 @@ public:
     Const * c= expr->eval();
     bool e=false;
     if(c->get_type()==BOOLEAN::getInstance()){
-      value v=c.get_value();
+      value v=c->get_value();
       e = v.b;
     }
     else{/*TODO ERROR incorrect type*/}
-    while(b) {
+    while(e) {
       stmt->run();
       Const * c= expr->eval();
-      bool e=false;
+      e=false;
       if(c->get_type()==BOOLEAN::getInstance()){
-        value v=c.get_value();
+        value v=c->get_value();
         e = v.b;
       }
       else{/*TODO ERROR incorrect type*/}
@@ -777,13 +775,13 @@ private:
   Stmt *stmt;
 };
 template<class T>
-std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) const{
+std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
   for(auto p :v)
   out<<*p<<",";
   return out;
 }
 
-template <class T>
+/*template <class T>
 class List: public AST{
 public:
   List(T *t):list(1,t){}
@@ -830,13 +828,15 @@ private:
 
 class Local: public AST{
 
-};
+};*/
 
 class Decl: public AST{
+public:
   Decl(std::string i,std::string ty):id(i),decl_type("unknown"){}
   virtual void printOn(std::ostream &out) const override {
     out << "Decl(" << decl_type <<":"<<id<<")";
   }
+  virtual void run() const{};
   std::string get_id(){return id;}
 protected:
   std::string id;
@@ -844,19 +844,22 @@ protected:
 };
 
 class LabelDecl:public Decl{
-  LabelDecl(Decl* d):id(d->get_id()),decl_type("label"){delete d;}
+  LabelDecl(Decl* d):Decl(d->get_id(),"label"){delete d;}
   virtual void printOn(std::ostream &out) const override {
     out << "LabelDecl("<<id<<")";
   }
-}
+};
 class VarDecl: public Decl{
-  VarDecl(Decl* d):id(d->get_id()),decl_type("var"),type(nullptr){delete d;}
-  VarDecl(Decl* d,Type* t):id(d->get_id()),decl_type("var"),type(t){delete d;}
+  VarDecl(Decl* d):Decl(d->get_id(),"var"),type(nullptr){delete d;}
+  VarDecl(Decl* d,Type* t):Decl(d->get_id(),"var"),type(t){delete d;}
   virtual void printOn(std::ostream &out) const override {
     if(type)
     out << "VarDecl(" <<id<<"of type "<< *type << ")";
     else
     out << "VarDecl(" <<id<<"of type NOTSET)";
+  }
+  virtual void run() const override{
+    //TODO globals.insert(std::pair<std::string,>)
   }
   void set_type(Type* ty){type=ty;}
 protected:
@@ -865,7 +868,7 @@ protected:
 
 
 
-class Body: public AST{
+/*class Body: public AST{
   Body(List<Local* > *l,List<Stmt*> *s):locals(l),stmts(s){}
   virtual void run() const override{
     locals->run();
@@ -875,3 +878,4 @@ protected:
   List<Local* > *locals;
   List<Stmt*> *stmts;
 };
+*/
