@@ -5,12 +5,14 @@
 #include <vector>
 #include <string>
 
+class Const;
 union value{
   char c;
   int i;
   double r;
   bool b;
   char* s;
+  Const* con;
 };
 
 template <class T>
@@ -114,7 +116,7 @@ public:
   }
   virtual bool doCompare(Type* t) override{
     if (!(name.compare(t->get_name())))
-      return type==t->get_type();
+      return type->doCompare(t->get_type());
     return false;
   }
 protected:
@@ -140,6 +142,7 @@ protected:
 class Const; //forward declaration of Const to use as eval() return Type
 
 extern std::map<std::string, Const*> globals; // map variable names to values
+extern std::map<std::string, Type*> declared; // map variable names to values
 
 
 class Expr: public AST {
@@ -161,7 +164,12 @@ public:
     out << "Id(" << var << ")";
   }
   virtual Const* eval() override {
-    return globals[var];
+    std::map<std::string,Const*>::iterator it;
+    it=globals.find(var);
+    if(it==globals.end()){//TODO error or uninitialized value
+      return nullptr;/*TODO throw error not found*/
+    }
+    return it->second;
   }
   std::string name(){
     return var;
@@ -245,18 +253,27 @@ private:
 class Pconst: public Const {
 public:
   Pconst():Const(new PtrType(ANY::getInstance())),ptr(0){}//TODO implement for pointers different than nil
-	Pconst(int pval,Type *t):Const(t),ptr(pval){}
+	Pconst(Const* pval,Type *t):Const(new PtrType(t)),ptr(pval){}
   virtual void printOn(std::ostream &out) const override {
     out << "Pconst(" << ptr << "of type "<<*type<< ")";
   }
   virtual value get_value() const override {
-    value v; v.i=ptr;
+    value v; v.con=ptr;
     return v;
   }
-private:
-  int ptr;
+protected:
+  Const* ptr;
 };
 
+class Arrconst: public Pconst{
+public:
+  Arrconst(Type* t, int s):Pconst( (Const* ) (malloc(sizeof(Const*)*s)), t),size(s){}
+  Const* get_element(int i){
+    return &(ptr[i]);
+  }
+protected:
+  int size;
+};
 class Bconst: public Const {
 public:
   Bconst(bool b):Const(BOOLEAN::getInstance()),boo(b){}
@@ -340,6 +357,14 @@ public:
         //is bool
           resType=boolType;
       }
+      if(!(op.compare("[]"))){
+        if(!(leftType->get_name().compare("array"))){
+          if(rightType->doCompare(intType)){
+            ArrType* p=static_cast<ArrType*>(rightType);
+            resType=p->get_type();
+          }
+        }
+      }
       if(!resType){/*TODO ERROR type mismatch*/}
       return;
     }
@@ -354,9 +379,18 @@ public:
       if(leftType->doCompare(boolType) )
         resType=boolType;
     }
-
+    if(!(op.compare("@"))){
+      resType=new PtrType(leftConst->get_type());
+    }
+    if(!(op.compare("^"))){
+      if(!(leftType->get_name().compare("pointer")) ){
+        PtrType* p = static_cast<PtrType*>(leftType);
+        resType=p->get_type();
+      }
+    }
     if(!resType){/*TODO ERROR type mismatch*/}
     return;
+
     //TODO @ and ^ operators typecheck
   }
 
@@ -690,9 +724,20 @@ public:
       bool lb=v.b;
       return new Bconst(not lb);
     }
-    if(!(op.compare("@"))) return leftConst->eval(); //TODO reference
-    if(!(op.compare("^"))) return leftConst->eval(); //TODO dereference
-    if(!(op.compare("[]"))) return leftConst->eval(); //TODO array index
+    if(!(op.compare("@"))) return leftConst;
+
+    if(!(op.compare("^"))) {
+      value v=leftConst->get_value();
+      Const* c=v.con;
+      PtrType *p=static_cast<PtrType*>(leftType);
+      return new Pconst(c,p->get_type());
+    }
+    if(!(op.compare("[]"))){
+      value v = rightConst->get_value();
+      int i=v.i;
+      Arrconst* arr = static_cast<Arrconst*> (leftConst);
+      return arr->get_element(i);
+    } //TODO array index
     return 0;  // this will never be reached.
   }
 private:
@@ -710,8 +755,33 @@ public:
     out << "Let(" << *id << ":=" << *expr << ")";
   }
   virtual void run() const override{
-    delete globals[id->name()];
-    globals[id->name()]=expr->eval();
+    Const* c = expr->eval();
+    std::map<std::string,Const*>::iterator it;
+    it=globals.find(id->name());
+    if(it==globals.end()){
+      std::map<std::string,Type*>::iterator it2;
+      if(it2==declared.end()){
+        return; //TODO throw error variable not declared
+      }
+      else{
+        if(c->get_type()->doCompare(it2->second) ){
+          globals[id->name()]=c;
+          return;
+        }
+        //TODO throw error type mismatch
+        return;
+      }
+    }
+    else{
+      Const* old=globals[id->name()];
+      if(c->get_type()->doCompare(old->get_type())){
+        delete globals[id->name()];
+        globals[id->name()]=c;
+        return;
+      }
+      //TODO throw error type mismatch
+      return;
+    }
   }
 private:
   Id  *id;
@@ -859,7 +929,7 @@ class VarDecl: public Decl{
     out << "VarDecl(" <<id<<"of type NOTSET)";
   }
   virtual void run() const override{
-    //TODO globals.insert(std::pair<std::string,>)
+    declared[id]=type;
   }
   void set_type(Type* ty){type=ty;}
 protected:
