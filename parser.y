@@ -164,15 +164,15 @@ l_value_ref:
   T_id; {$$ = new Id($1);}
 | "result" {$$ = new Id("result");}
 | T_sconst {$$ = new Sconst($1);}
-| l_value_ref '[' expr ']' %prec BRACKETS {$$=new Id("TEMP");/*TODO $$ = new Op("[]",$1,$3);*/}
+| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
 | '(' l_value ')' {$$ = $2;}
 
 l_value:
-  expr '^' {$$=new Id("TEMP");/*TODO $$ = new Op("^",$1);**/}
+  expr '^' {$$ = new Op("^",$1);*}
 | T_id; {$$ = new Id($1);}
 | "result" {$$ = new Id("result");}
 | T_sconst {$$ = new Sconst($1);}
-| l_value '[' expr ']' %prec BRACKETS {$$=new Id("TEMP");/*TODO $$ = new Op("[]",$1,$3);*/}
+| l_value '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
 | '(' l_value ')'{$$ = $2;}
 ;
 
