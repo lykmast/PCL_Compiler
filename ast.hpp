@@ -38,7 +38,8 @@ public:
   std::string get_name(){
     return name;
   }
-  virtual Type* get_type() const{ return nullptr;}
+  virtual Type* get_type() const{ return nullptr;}//TODO erase
+  virtual Const* create() const{return nullptr;}
   virtual void printOn(std::ostream &out) const override {
     out << "Type(" << name << ")";
   }
@@ -60,12 +61,15 @@ public:
 		static INTEGER instance;
 		return &instance;
 	}
+  virtual Const* create() const;
+
 };
 
 class REAL: public Type{
 private:
   REAL():Type("real"){}  //private constructor to prevent instancing
 public:
+  virtual Const* create() const;
 	static REAL* getInstance(){
 		static REAL instance;
 		return &instance;
@@ -76,6 +80,7 @@ class BOOLEAN: public Type{
 private:
 	BOOLEAN():Type("boolean"){}  //private constructor to prevent instancing
 public:
+  virtual Const* create() const;
 	static BOOLEAN* getInstance(){
 		static BOOLEAN instance;
 		return &instance;
@@ -86,6 +91,7 @@ class CHARACTER: public Type{
 private:
   CHARACTER():Type("character"){}  //private constructor to prevent instancing
 public:
+  virtual Const* create() const;
 	static CHARACTER* getInstance(){
 		static CHARACTER instance;
 		return &instance;
@@ -105,8 +111,9 @@ public:
 class PtrType: public Type{
 public:
   PtrType(Type* t):Type("pointer"),type(t){}
-	PtrType(std::string name,Type* t):Type(name),type(t){}
+	PtrType(std::string name,Type* t):Type(name),type(t){}//TODO erase
   ~PtrType(){if(type->should_delete()) delete type;}
+  virtual Const* create() const;
   Type* get_type(){ return type;}
   virtual void printOn(std::ostream &out) const override {
     out << "PtrType(" << name <<"of type "<< *type << ")";
@@ -128,6 +135,7 @@ public:
   ArrType(int s,Type* t):size(s),PtrType("array",t){}
   ArrType(Type* t):size(-1),PtrType("array",t){}
   ~ArrType(){if(type->should_delete()) delete type;}
+  virtual Const* create() const;
   int get_size(){return size;}
   virtual void printOn(std::ostream &out) const override {
     out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
@@ -171,6 +179,9 @@ public:
     }
     return it->second;
   }
+  Type* get_type() const{
+    return declared[var];
+  }
   std::string name(){
     return var;
   }
@@ -180,12 +191,14 @@ private:
 
 class Const: public Expr{
 public:
-  Const(Type* ty):type(ty){}
+  Const(Type* ty,bool dyn = false):type(ty),dynamic(dyn){}
   Type* get_type(){return type;}
   virtual void printOn(std::ostream &out) const =0;
 	virtual Const* eval() override{return this;}
   virtual value get_value() const=0;
+  bool isDynamic(){return dynamic;}
 protected:
+  bool dynamic;
   Type* type;
 };
 
@@ -209,7 +222,7 @@ private:
 
 class Iconst: public Const {
 public:
-  Iconst(int n):Const(INTEGER::getInstance()),num(n){}
+  Iconst(int n, bool dyn=false):Const(INTEGER::getInstance(),dyn),num(n){}
   virtual void printOn(std::ostream &out) const override {
     out << "Iconst(" << num << ")";
   }
@@ -221,10 +234,13 @@ private:
   int num;
 };
 
+Const* INTEGER::create() const{
+  return new Iconst(0, true);
+}
 
 class Rconst: public Const {
 public:
-  Rconst(double n):Const(REAL::getInstance()),num(n){}
+  Rconst(double n, bool dyn=false):Const(REAL::getInstance(), dyn),num(n){}
   virtual void printOn(std::ostream &out) const override {
     out << "Rconst(" << num << ")";
   }
@@ -236,9 +252,13 @@ private:
   double num;
 };
 
+Const* REAL::create() const{
+  return new Rconst(0, true);
+}
+
 class Cconst: public Const {
 public:
-  Cconst(char c):Const(CHARACTER::getInstance()),ch(c){}
+  Cconst(char c, bool dyn=false):Const(CHARACTER::getInstance(), dyn),ch(c){}
   virtual void printOn(std::ostream &out) const override {
     out << "Cconst(" << ch << ")";
   }
@@ -250,10 +270,14 @@ private:
   char ch;
 };
 
+Const* CHARACTER::create() const{
+  return new Cconst('\0', true);
+}
+
 class Pconst: public Const {
 public:
   Pconst():Const(new PtrType(ANY::getInstance())),ptr(0){}//TODO implement for pointers different than nil
-	Pconst(Const* pval,Type *t):Const(new PtrType(t)),ptr(pval){}
+	Pconst(Const* pval,Type *t, bool dyn=false):Const(new PtrType(t), dyn),ptr(pval){}
   virtual void printOn(std::ostream &out) const override {
     out << "Pconst(" << ptr << "of type "<<*type<< ")";
   }
@@ -265,18 +289,27 @@ protected:
   Const* ptr;
 };
 
+Const* PtrType::create() const{
+  return new Pconst(type->create(),type, true);
+}
+
 class Arrconst: public Pconst{
 public:
-  Arrconst(Type* t, int s):Pconst( (Const* ) (malloc(sizeof(Const*)*s)), t),size(s){}
+  Arrconst(int s, Type* t, bool dyn=false):Pconst( (Const* ) (malloc(sizeof(Const)*s)), t, dyn),size(s){}
   Const* get_element(int i){
     return &(ptr[i]);
   }
 protected:
   int size;
 };
+
+Const* ArrType::create() const{
+  return new Arrconst(size,type, true);
+}
+
 class Bconst: public Const {
 public:
-  Bconst(bool b):Const(BOOLEAN::getInstance()),boo(b){}
+  Bconst(bool b, bool dyn=false):Const(BOOLEAN::getInstance(), dyn),boo(b){}
   virtual void printOn(std::ostream &out) const override {
     out << "Bconst(" << boo << ")";
   }
@@ -285,9 +318,12 @@ public:
     return v;
   }
 private:
-
   bool boo;
 };
+
+Const* BOOLEAN::create() const{
+  return new Bconst(false, true);
+}
 
 class Op: public Expr {
 public:
@@ -360,7 +396,7 @@ public:
       if(!(op.compare("[]"))){
         if(!(leftType->get_name().compare("array"))){
           if(rightType->doCompare(intType)){
-            ArrType* p=static_cast<ArrType*>(rightType);
+            ArrType* p=static_cast<ArrType*>(leftType);
             resType=p->get_type();
           }
         }
@@ -397,9 +433,7 @@ public:
   virtual Const* eval() override {
     // before the first eval of any op, there must have been one typecheck to
     // fill resType, leftType, rightType
-    Type* intType=INTEGER::getInstance();
     Type* realType=REAL::getInstance();
-    Type* boolType=BOOLEAN::getInstance();
     left->typecheck();
     Const *leftConst=left->eval();
     Const *rightConst=nullptr;
@@ -737,7 +771,7 @@ public:
       int i=v.i;
       Arrconst* arr = static_cast<Arrconst*> (leftConst);
       return arr->get_element(i);
-    } //TODO array index
+    }
     return 0;  // this will never be reached.
   }
 private:
@@ -844,6 +878,96 @@ private:
   Expr *expr;
   Stmt *stmt;
 };
+
+class New: public Stmt{
+public:
+  New(Expr* e, Id* i):expr(e),id(i){}
+  ~New(){delete expr; delete id;}
+  virtual void printOn(std::ostream &out) const override {
+    if(expr)
+      out << "New( [" << *expr << "] of " << *id << ")";
+    else
+      out << "New( [] of " << *id << ")";
+  }
+
+  virtual void run() const override{
+    if(expr){
+      expr->typecheck();
+      Const* c= expr->eval();
+      if(!(c->get_type()->doCompare(INTEGER::getInstance())) ){
+        /*TODO ERROR incorrect type*/
+      }
+      value v = c->get_value();
+      int i = v.i;
+      if(i<=0) {/*TODO ERROR incorrect type*/}
+      Type* idType=id->get_type();
+      if(idType->get_name().compare("pointer") )
+      {/*TODO ERROR incorrect type*/}
+      PtrType* p=static_cast<PtrType*>(idType);
+      Type* t=p->get_type();
+      if(t->get_name().compare("array") )
+      {/*TODO ERROR incorrect type*/}
+      ArrType* arrT = static_cast<ArrType*>(t);
+      ArrType* arrT_size = new ArrType(i,arrT->get_type());
+      delete arrT;
+      Pconst *ret = new Pconst(arrT_size->create(), arrT_size );
+      Let(id, ret);
+    }
+
+    Type* idType=id->get_type();
+    if(idType->get_name().compare("pointer") )
+    {/*TODO ERROR incorrect type*/}
+    PtrType* p=static_cast<PtrType*>(idType);
+    Type* t=p->get_type();
+    Pconst *ret = new Pconst(t->create(), t);
+    Let(id, ret);
+  }
+
+protected:
+  Expr* expr;
+  Id* id;
+};
+
+
+class Dispose: public Stmt{
+public:
+  Dispose(Id* i):id(i){}
+  ~Dispose(){delete id;}
+  virtual void run() const{
+    if(id->get_type()->get_name().compare("pointer"))
+    {/*TODO ERROR incorrect type*/}
+    Const *c = id->eval();
+    value v = c->get_value();
+    Const* ptr = v.con;
+    if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
+    delete ptr;
+    Let(id, new Pconst());
+  }
+protected:
+  Id *id;
+};
+
+class DisposeArr: public Stmt{
+public:
+  DisposeArr(Id* i):id(i){}
+  ~DisposeArr(){delete id;}
+  virtual void run() const{
+    Type* t=id->get_type();
+    if(t->get_name().compare("pointer"))
+    {/*TODO ERROR incorrect type*/}
+    PtrType *pt = static_cast<PtrType*>(t);
+    if(pt->get_name().compare("array"))
+    {/*TODO ERROR incorrect type*/}
+    Const *c = id->eval();
+    value v = c->get_value();
+    Const* ptr = v.con;
+    if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
+    delete ptr;
+    Let(id, new Pconst());
+  }
+protected:
+  Id *id;
+};
 template<class T>
 std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
   for(auto p :v)
@@ -851,7 +975,7 @@ std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
   return out;
 }
 
-/*template <class T>
+template <class T>
 class List: public AST{
 public:
   List(T *t):list(1,t){}
@@ -866,12 +990,17 @@ public:
   void append(T *t){
     list.push_back(t);
   }
+  void merge(List* l){
+    list.insert(list.end(),l->list.begin(),l->list.end());
+    delete l;
+  }
   friend class Body;
 protected:
   std::vector<T*> list;
 };
 
-class ExprList: public List<Expr* > {
+
+/*class ExprList: public List<Expr* > {
   ExprList(Expr *e):list(1,e){}
   ~ExprList(){
     for(auto p:list)
@@ -893,12 +1022,12 @@ class ExprList: public List<Expr* > {
   }
 private:
   std::vector<Expr*> list;
-};
+};*/
 
 
 class Local: public AST{
 
-};*/
+};
 
 class Decl: public AST{
 public:
@@ -914,12 +1043,14 @@ protected:
 };
 
 class LabelDecl:public Decl{
+public:
   LabelDecl(Decl* d):Decl(d->get_id(),"label"){delete d;}
   virtual void printOn(std::ostream &out) const override {
     out << "LabelDecl("<<id<<")";
   }
 };
 class VarDecl: public Decl{
+public:
   VarDecl(Decl* d):Decl(d->get_id(),"var"),type(nullptr){delete d;}
   VarDecl(Decl* d,Type* t):Decl(d->get_id(),"var"),type(t){delete d;}
   virtual void printOn(std::ostream &out) const override {
@@ -936,6 +1067,29 @@ protected:
   Type* type;
 };
 
+
+class DeclList: public List<Decl>{
+public:
+  DeclList(Decl* d):List<Decl>(d){}
+  void append_id(Decl *d){
+    append(d);
+  }
+  void append_decl(DeclList* l){
+    merge(l);
+  }
+  void toVar(Type* t){
+    for(auto p:list){
+      Decl *d=new VarDecl(p,t);
+      p=d;
+    }
+  }
+  void toLabel(){
+    for(auto p:list){
+      Decl *d=new LabelDecl(p);
+      p=d;
+    }
+  }
+};
 
 
 /*class Body: public AST{
