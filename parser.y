@@ -85,19 +85,19 @@ mult_locals:
 
 local:
   "var" var_decl {$$ = $2;}
-| "label" mult_ids ';' {$$ = new Label($2);}
+| "label" mult_ids ';' {$2->toLabel(); $$=$2;}
 | header ';' body ';' {$1->body($3); $$=$1;}
 | "forward" header ';' {$$ = new Forward($2);}
 ;
 
 var_decl:
-  mult_ids ':' type ';' {$1->set_type($3); $$ = $1;}
-| var_decl ';' mult_ids ':' type {$1->append_decl($2); $1->set_type($3); $$=$1;}
+  mult_ids ':' type ';' {$1->toVar($3); $$ = $1;}
+| var_decl ';' mult_ids ':' type {$3->toVar($5); $1->append_decl($3); $$=$1;}
 ;
 
 mult_ids:
-  T_id {$$ = new List<Decl*>($1);}
-| mult_ids ',' T_id {$1->append_id($3); $$=$1;}
+  T_id {$$ = new DeclList($1);}
+| mult_ids ',' T_id {$1->append_id(new Decl($3)); $$=$1;}
 ;
 
 type:
@@ -150,10 +150,10 @@ stmt:
 | T_id ':' stmt { $$=$3;/*TODO $3->target($1); $$=$3; */}
 | "goto" T_id { $$=new Stmt();/*TODO $$ = new Goto($2);*/ }
 | "return" {$$=new Stmt();/*TODO $$ = new Return();*/}
-| "new" '[' expr ']' l_value {$$=new Stmt();/*TODO $$ = new New($5,$3);*/}
-| "new" l_value {$$=new Stmt();/*TODO $$=new New($2);*/}
-| "dispose" '[' ']' l_value {$$=new Stmt();/*TODO $$ = new Dispose($4);*/}
-| "dispose" l_value {$$=new Stmt();/*TODO $$ = new Dispose($2);*/}
+| "new" '[' expr ']' l_value {$$ = new New($5,$3);}
+| "new" l_value {$$=new New($2);}
+| "dispose" '[' ']' l_value {$$ = new DisposeArr($4);}
+| "dispose" l_value {$$ = new Dispose($2);}
 ;
 
 expr:
