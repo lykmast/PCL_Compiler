@@ -53,6 +53,17 @@ protected:
   std::string name;
 };
 
+class LABEL: public Type{
+private:
+  LABEL():Type("label"){}  //private constructor to prevent instancing
+public:
+  static LABEL* getInstance(){
+    static LABEL instance;
+    return &instance;
+  }
+};
+
+
 class INTEGER: public Type{
 private:
   INTEGER():Type("integer"){}  //private constructor to prevent instancing
@@ -979,6 +990,7 @@ template <class T>
 class List: public AST{
 public:
   List(T *t):list(1,t){}
+  List():list(){}
   ~List(){
     for(auto p:list)
     delete p;
@@ -990,6 +1002,7 @@ public:
   void append(T *t){
     list.push_back(t);
   }
+  bool isEmpty(){return list.empty();}
   void merge(List* l){
     list.insert(list.end(),l->list.begin(),l->list.end());
     delete l;
@@ -999,30 +1012,35 @@ protected:
   std::vector<T*> list;
 };
 
-
-/*class ExprList: public List<Expr* > {
-  ExprList(Expr *e):list(1,e){}
-  ~ExprList(){
-    for(auto p:list)
-    delete p;
-    list.clear();
+class StmtList: public List<Stmt>, public Stmt{
+public:
+  StmtList(Stmt *s):List<Stmt>(s){}
+  StmtList():List<Stmt>(){}
+  virtual void printOn(std::ostream &out) const override {
+    out << "StmtList(" << list << ")";
   }
+  virtual void run() const{
+    for(auto p:list)
+      p->run();
+  }
+};
+class ExprList: public List<Expr> {
+  ExprList(Expr *e):List<Expr>(e){}
   virtual void printOn(std::ostream &out) const override {
     out << "ExprList(" << list << ")";
   }
-  void append(Expr *e){
-    list.push_back(e);
-  }
-  virtual std::vector<ValueType*> eval(){
-    std::vector<ValueType*> ret;
-    ValueType *v;
-    for(auto p:list)
-    v=p->eval();
-    ret.push_back(v);
+  virtual std::vector<Const*> eval(){
+    std::vector<Const*> ret(list.size());
+    Const *c;
+    for(auto p:list){
+      c=p->eval();
+      ret.push_back(c);
+    }
+    return ret;
   }
 private:
   std::vector<Expr*> list;
-};*/
+};
 
 
 class Local: public AST{
@@ -1048,6 +1066,9 @@ public:
   virtual void printOn(std::ostream &out) const override {
     out << "LabelDecl("<<id<<")";
   }
+  virtual void run() const override{
+    declared[id]=LABEL::getInstance();
+  }
 };
 class VarDecl: public Decl{
 public:
@@ -1067,28 +1088,65 @@ protected:
   Type* type;
 };
 
+class FormalDecl: public VarDecl{
+public:
+  FormalDecl(Decl *d, bool ref):VarDecl(d), byRef(ref){}
+  FormalDecl(Decl* d,Type* t,bool ref):VarDecl(d,t), byRef(ref){}
+  bool isByRef(){return byRef;}
+protected:
+  bool byRef;
+};
 
 class DeclList: public List<Decl>{
 public:
   DeclList(Decl* d):List<Decl>(d){}
-  void append_id(Decl *d){
-    append(d);
-  }
-  void append_decl(DeclList* l){
-    merge(l);
-  }
+  DeclList():List<Decl>(){}
   void toVar(Type* t){
     for(auto p:list){
       Decl *d=new VarDecl(p,t);
       p=d;
     }
   }
+  void run() const{
+    for(auto p:list)
+      p->run();
+  }
+
   void toLabel(){
     for(auto p:list){
       Decl *d=new LabelDecl(p);
       p=d;
     }
   }
+  void toFormal(Type* t, bool ref){
+    for(auto p:list){
+      Decl *d=new FormalDecl(p,t,ref);
+      p=d;
+    }
+  }
+};
+
+class Body: public AST{
+public:
+  Body(DeclList* d, StmtList* s):declarations(d),statements(s){}
+  ~Body(){delete declarations; delete statements;}
+  void declare() const{
+    declarations->run();
+  }
+
+  void run() const{
+    statements->run();
+  }
+
+protected:
+  DeclList* declarations;
+  StmtList* statements;
+};
+
+class Function:public Decl{
+
+protected:
+  DeclList* formals;
 };
 
 
