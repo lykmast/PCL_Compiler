@@ -173,6 +173,9 @@ public:
 class Stmt: public AST {
 public:
   virtual void run() const{}; //empty stmt -> do nothing
+  virtual void printOn(std::ostream &out) const override {
+    out << "Stmt()";
+  }
 };
 
 
@@ -235,7 +238,7 @@ class Iconst: public Const {
 public:
   Iconst(int n, bool dyn=false):Const(INTEGER::getInstance(),dyn),num(n){}
   virtual void printOn(std::ostream &out) const override {
-    out << "Iconst(" << num << ")";
+    out << "Iconst(" << num <<" ,dynamic:"<<dynamic<< ")";
   }
   virtual value get_value() const override {
     value v; v.i=num;
@@ -253,7 +256,7 @@ class Rconst: public Const {
 public:
   Rconst(double n, bool dyn=false):Const(REAL::getInstance(), dyn),num(n){}
   virtual void printOn(std::ostream &out) const override {
-    out << "Rconst(" << num << ")";
+    out << "Rconst(" << num <<" ,dynamic:"<<dynamic<< ")";
   }
   virtual value get_value() const override {
     value v; v.r=num;
@@ -271,7 +274,7 @@ class Cconst: public Const {
 public:
   Cconst(char c, bool dyn=false):Const(CHARACTER::getInstance(), dyn),ch(c){}
   virtual void printOn(std::ostream &out) const override {
-    out << "Cconst(" << ch << ")";
+    out << "Cconst(" << ch <<" ,dynamic:"<<dynamic<< ")";
   }
   virtual value get_value() const override {
     value v; v.c=ch;
@@ -290,7 +293,7 @@ public:
   Pconst():Const(new PtrType(ANY::getInstance())),ptr(0){}//TODO implement for pointers different than nil
 	Pconst(Const* pval,Type *t, bool dyn=false):Const(new PtrType(t), dyn),ptr(pval){}
   virtual void printOn(std::ostream &out) const override {
-    out << "Pconst(" << ptr << "of type "<<*type<< ")";
+    out << "Pconst(" << ptr << "of type "<<*type<<" ,dynamic:"<<dynamic<< ")";
   }
   virtual value get_value() const override {
     value v; v.con=ptr;
@@ -310,6 +313,9 @@ public:
   Const* get_element(int i){
     return &(ptr[i]);
   }
+  virtual void printOn(std::ostream &out) const override {
+    out << "Arrconst(" << ptr <<"["<<size<<"]"<<"of type "<< *type <<" ,dynamic:"<<dynamic<< ")";
+  }
 protected:
   int size;
 };
@@ -322,7 +328,7 @@ class Bconst: public Const {
 public:
   Bconst(bool b, bool dyn=false):Const(BOOLEAN::getInstance(), dyn),boo(b){}
   virtual void printOn(std::ostream &out) const override {
-    out << "Bconst(" << boo << ")";
+    out << "Bconst(" << boo << " ,dynamic:"<<dynamic<<")";
   }
   virtual value get_value() const override {
     value v; v.b=boo;
@@ -954,6 +960,9 @@ public:
     delete ptr;
     Let(id, new Pconst());
   }
+  virtual void printOn(std::ostream &out) const override {
+      out << "Dispose( " << *id << ")";
+  }
 protected:
   Id *id;
 };
@@ -975,6 +984,9 @@ public:
     if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
     delete ptr;
     Let(id, new Pconst());
+  }
+  virtual void printOn(std::ostream &out) const override {
+      out << "Dispose[]( " << *id << ")";
   }
 protected:
   Id *id;
