@@ -71,33 +71,33 @@
 %%
 
 program:
-  "program" T_id ';' body '.' {$$=$4; /*TODO $$ = new Program($2,$4);*/}
+  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/}
 ;
 
 body:
-  mult_locals block {$1->merge($2); $$=$1;}
+  mult_locals block {$$=new Body($1,$2);}
 ;
 
 mult_locals:
- /* nothing */ {$$ = new Block();}
+ /* nothing */ {$$ = new DeclList();}
 | mult_locals local { $1->append_local($2); }
 ;
 
 local:
   "var" var_decl {$$ = $2;}
 | "label" mult_ids ';' {$2->toLabel(); $$=$2;}
-| header ';' body ';' {$1->body($3); $$=$1;}
-| "forward" header ';' {$$ = new Forward($2);}
+| header ';' body ';' {/*TODO $1->body($3); $$=$1;*/}
+| "forward" header ';' {/*TODO $$ = new Forward($2);*/}
 ;
 
 var_decl:
   mult_ids ':' type ';' {$1->toVar($3); $$ = $1;}
-| var_decl ';' mult_ids ':' type {$3->toVar($5); $1->append_decl($3); $$=$1;}
+| var_decl ';' mult_ids ':' type {$3->toVar($5); $1->merge($3); $$=$1;}
 ;
 
 mult_ids:
   T_id {$$ = new DeclList($1);}
-| mult_ids ',' T_id {$1->append_id(new Decl($3)); $$=$1;}
+| mult_ids ',' T_id {$1->append(new Decl($3)); $$=$1;}
 ;
 
 type:
@@ -111,23 +111,23 @@ type:
 ;
 
 header:
-  "procedure" T_id '(' args ')' {$$ = new Function($2,$4,new Type("void"));}
-| "function" T_id '(' args ')' ':' type {$$ = new Function($2,$4,$6);}
+  "procedure" T_id '(' args ')' {/*TODO $$ = new Function($2,$4,new Type("void"));*/}
+| "function" T_id '(' args ')' ':' type {/*TODO $$ = new Function($2,$4,$6);*/}
 ;
 
 args:
-/*nothing*/ {$$ = new Decl();}
+/*nothing*/ {$$ = new DeclList();}
 | mult_formals {$$ = $1;}
 ;
 
 mult_formals:
   formal {$$ = $1;}
-| mult_formals ';' formal {$1->append_decl($3);}
+| mult_formals ';' formal {$1->merge($3);}
 ;
 
 formal:
-  "var" mult_ids ':' type {$2->set_type($4); $$=$2;}
-| mult_ids ':' type {$1->set_type($3); $$ = $1;}
+  "var" mult_ids ':' type {$2->toFormal($4,true); $$=$2;}
+| mult_ids ':' type {$1->toFormal($3,false); $$ = $1;}
 ;
 
 block:
@@ -135,14 +135,14 @@ block:
 ;
 
 mult_stmts:
-  stmt {$$ = new CommandBlock($1);}
-| mult_stmts ';' stmt { $1->append_stmt($3);}
+  stmt {$$ = new StmtList($1);}
+| mult_stmts ';' stmt { $1->append($3);}
 ;
 
 stmt:
 /*nothing*/ {$$ = new Stmt();}
 | l_value ":=" expr {$$ = new Let($1,$3);}
-| block {$$= new Stmt();/*TODO $$ = new Stmt($1);*/}
+| block {$$= $1;}
 | call {$$= new Stmt();/*TODO $$= new Stmt($1);*/ /*call can be a statement only if it is a proc call*/}
 | "if" expr "then" stmt "else" stmt {$$ = new If($2,$4,$6);}
 | "if" expr "then" stmt {$$ = new If($2,$4,nullptr);}
@@ -206,7 +206,7 @@ r_value:
 ;
 
 call:
-  T_id '('params')' {$$=new Iconst(0);/*TODO $$ = new Call($1,$3);*/}
+  T_id '('params')' {/*TODO $$ = new Call($1,$3);*/}
 ;
 
 params:
