@@ -4,3 +4,6 @@
 *.cpp
 !Makefile
 *.gch
+*.o
+*.output
+parser.hpp
