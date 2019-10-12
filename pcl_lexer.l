@@ -3,6 +3,7 @@
 %{
 	#include <cstdio>
 	#include <cstdlib>
+	#include "ast.hpp"
 	#include "pcl_lexer.hpp"
 	#include "parser.hpp"
 %}
