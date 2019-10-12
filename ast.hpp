@@ -5,20 +5,14 @@
 #include <vector>
 #include <string>
 
-class Const;
+class LValue;
 union value{
 	char c;
 	int i;
 	double r;
 	bool b;
 	char* s;
-	Const* con;
-};
-
-template <class T>
-class Triplet{
-public:
-	T* first,*second,*third;
+	LValue* lval;
 };
 
 class AST {
@@ -31,7 +25,8 @@ inline std::ostream& operator<< (std::ostream &out, const AST &t) {
 	t.printOn(out);
 	return out;
 }
-
+class Const;
+class UnnamedLValue;
 class Type: public AST{
 public:
 	Type(std::string t):name(t){}
@@ -39,7 +34,7 @@ public:
 		return name;
 	}
 	virtual Type* get_type() const{ return nullptr;}//TODO erase
-	virtual Const* create() const{return nullptr;}
+	virtual UnnamedLValue* create() const{return nullptr;}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Type(" << name << ")";
 	}
@@ -72,7 +67,7 @@ public:
 		static INTEGER instance;
 		return &instance;
 	}
-	virtual Const* create() const;
+	virtual UnnamedLValue* create() const;
 
 };
 
@@ -80,7 +75,7 @@ class REAL: public Type{
 private:
 	REAL():Type("real"){}  //private constructor to prevent instancing
 public:
-	virtual Const* create() const;
+	virtual UnnamedLValue* create() const;
 	static REAL* getInstance(){
 		static REAL instance;
 		return &instance;
@@ -91,7 +86,7 @@ class BOOLEAN: public Type{
 private:
 	BOOLEAN():Type("boolean"){}  //private constructor to prevent instancing
 public:
-	virtual Const* create() const;
+	virtual UnnamedLValue* create() const;
 	static BOOLEAN* getInstance(){
 		static BOOLEAN instance;
 		return &instance;
@@ -102,7 +97,7 @@ class CHARACTER: public Type{
 private:
 	CHARACTER():Type("character"){}  //private constructor to prevent instancing
 public:
-	virtual Const* create() const;
+	virtual UnnamedLValue* create() const;
 	static CHARACTER* getInstance(){
 		static CHARACTER instance;
 		return &instance;
@@ -124,7 +119,7 @@ public:
 	PtrType(Type* t):Type("pointer"),type(t){}
 	PtrType(std::string name,Type* t):Type(name),type(t){}//TODO erase
 	~PtrType(){if(type->should_delete()) delete type;}
-	virtual Const* create() const;
+	virtual UnnamedLValue* create() const;
 	Type* get_type(){ return type;}
 	virtual void printOn(std::ostream &out) const override {
 		out << "PtrType(" << name <<"of type "<< *type << ")";
@@ -146,7 +141,7 @@ public:
 	ArrType(int s,Type* t):size(s),PtrType("array",t){}
 	ArrType(Type* t):size(-1),PtrType("array",t){}
 	~ArrType(){if(type->should_delete()) delete type;}
-	virtual Const* create() const;
+	virtual UnnamedLValue* create() const;
 	int get_size(){return size;}
 	virtual void printOn(std::ostream &out) const override {
 		out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
@@ -158,7 +153,6 @@ protected:
 // const Type * INTEGER=new Type("integer"),* REAL=new Type("real"),
 // *BOOLEAN=new Type("boolean"), CHARACTER=new Type("char");
 
-class Const; //forward declaration of Const to use as eval() return Type
 
 extern std::map<std::string, Const*> globals; // map variable names to values
 extern std::map<std::string, Type*> declared; // map variable names to values
@@ -170,7 +164,7 @@ public:
 	virtual void typecheck() {};
 };
 
-class Stmt: public AST {
+class Stmt: virtual public AST {
 public:
 	virtual void run() const{}; //empty stmt -> do nothing
 	virtual void printOn(std::ostream &out) const override {
@@ -178,47 +172,104 @@ public:
 	}
 };
 
-
-class Id: public Expr {
+class Const: public Expr{
 public:
-	Id(std::string v): var(v) {}
+	Const(Type* ty):type(ty){}
+	~Const(){if(type->should_delete()) delete type;}
+	Type* get_type(){return type;}
+	virtual void printOn(std::ostream &out) const =0;
+	virtual Const* eval() override{return this;}
+	virtual value get_value() const=0;
+protected:
+	Type* type;
+};
+
+
+
+class LValue: public Expr{
+public:
+	LValue(bool dyn=false):dynamic(dyn){}
+	virtual void let(Const* c)=0;
+	virtual Type* get_type()=0;
+	bool isDynamic(){return dynamic;}
+protected:
+	bool dynamic;
+};
+
+
+class Id: public LValue {
+public:
+	Id(std::string v): name(v) {}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Id(" << var << ")";
+		out << "Id(" << name << ")";
 	}
 	virtual Const* eval() override {
 		std::map<std::string,Const*>::iterator it;
-		it=globals.find(var);
+		it=globals.find(name);
 		if(it==globals.end()){//TODO error or uninitialized value
 			return nullptr;/*TODO throw error not found*/
 		}
 		return it->second;
 	}
-	Type* get_type() const{
-		return declared[var];
+
+	virtual void let(Const* c){
+		bool hasValue=lookup();
+		if(!(c->get_type()->doCompare(this->get_type())) ){
+		//TODO throw error type mismatch
+			return;
+		}
+		if(hasValue) delete globals[name];
+		globals[name]=c;
 	}
-	std::string name(){
-		return var;
+	virtual Type* get_type(){
+		return declared[name];
+	}
+	std::string get_name(){
+		return name;
 	}
 private:
-	std::string var;
+	std::string name;
+
+	bool lookup(){//returns true if the id already exists in globals
+		std::map<std::string,Const*>::iterator it;
+		it=globals.find(name);
+		if(it==globals.end()){
+			std::map<std::string,Type*>::iterator it2;
+			if(it2==declared.end()){
+				 //TODO throw error variable not declared
+			}
+			return false;
+		}
+		return true;
+	}
 };
 
-class Const: public Expr{
+class UnnamedLValue: public LValue{
 public:
-	Const(Type* ty,bool dyn = false):type(ty),dynamic(dyn){}
-	Type* get_type(){return type;}
-	virtual void printOn(std::ostream &out) const =0;
-	virtual Const* eval() override{return this;}
-	virtual value get_value() const=0;
-	bool isDynamic(){return dynamic;}
+	UnnamedLValue(Type *ty,bool dyn=false):LValue(dyn),value(nullptr),type(ty){}
+	UnnamedLValue(Const* val, Type* ty,bool dyn=false):LValue(dyn),value(val),type(ty){}
+	~UnnamedLValue(){delete value;}
+	virtual void printOn(std::ostream &out) const override {
+		out << "UnnamedLValue(" << value<<","<<type << ")";
+	}
+	virtual void let(Const* c) override{
+		if(value) delete value;
+		value=c;
+	}
+	virtual Const* eval() override{
+		return value;
+	}
+	virtual Type* get_type(){
+		return type;
+	}
 protected:
-	bool dynamic;
+	Const* value;
 	Type* type;
 };
 
-class Sconst: public Const {
+class Sconst: public UnnamedLValue {
 public:
-	Sconst(std::string s):Const(new ArrType(s.size()-1,CHARACTER::getInstance())) {
+	Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::getInstance())) {
 		str=(char*)(malloc(sizeof(char)*(s.size()-1)));
 		s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
 		str[s.size()-2]='\0';
@@ -236,9 +287,9 @@ private:
 
 class Iconst: public Const {
 public:
-	Iconst(int n, bool dyn=false):Const(INTEGER::getInstance(),dyn),num(n){}
+	Iconst(int n):Const(INTEGER::getInstance()),num(n){}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Iconst(" << num <<" ,dynamic:"<<dynamic<< ")";
+		out << "Iconst(" << num << ")";
 	}
 	virtual value get_value() const override {
 		value v; v.i=num;
@@ -248,15 +299,15 @@ private:
 	int num;
 };
 
-Const* INTEGER::create() const{
-	return new Iconst(0, true);
+UnnamedLValue* INTEGER::create() const{
+	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
 class Rconst: public Const {
 public:
-	Rconst(double n, bool dyn=false):Const(REAL::getInstance(), dyn),num(n){}
+	Rconst(double n):Const(REAL::getInstance() ),num(n){}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Rconst(" << num <<" ,dynamic:"<<dynamic<< ")";
+		out << "Rconst(" << num << ")";
 	}
 	virtual value get_value() const override {
 		value v; v.r=num;
@@ -266,15 +317,15 @@ private:
 	double num;
 };
 
-Const* REAL::create() const{
-	return new Rconst(0, true);
+UnnamedLValue* REAL::create() const{
+	return new UnnamedLValue(REAL::getInstance(),true);
 }
 
 class Cconst: public Const {
 public:
-	Cconst(char c, bool dyn=false):Const(CHARACTER::getInstance(), dyn),ch(c){}
+	Cconst(char c):Const(CHARACTER::getInstance() ),ch(c){}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Cconst(" << ch <<" ,dynamic:"<<dynamic<< ")";
+		out << "Cconst(" << ch << ")";
 	}
 	virtual value get_value() const override {
 		value v; v.c=ch;
@@ -284,51 +335,51 @@ private:
 	char ch;
 };
 
-Const* CHARACTER::create() const{
-	return new Cconst('\0', true);
+UnnamedLValue* CHARACTER::create() const{
+	return new UnnamedLValue(CHARACTER::getInstance(),true);
 }
 
 class Pconst: public Const {
 public:
-	Pconst():Const(new PtrType(ANY::getInstance())),ptr(0){}//TODO implement for pointers different than nil
-	Pconst(Const* pval,Type *t, bool dyn=false):Const(new PtrType(t), dyn),ptr(pval){}
+	Pconst():Const(new PtrType(ANY::getInstance())),ptr(nullptr){}//TODO implement for pointers different than nil
+	Pconst(LValue* pval,Type *t):Const(new PtrType(t) ),ptr(pval){}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Pconst(" << ptr << "of type "<<*type<<" ,dynamic:"<<dynamic<< ")";
+		out << "Pconst(" << ptr << "of type "<<*type<< ")";
 	}
 	virtual value get_value() const override {
-		value v; v.con=ptr;
+		value v; v.lval=ptr;
 		return v;
 	}
 protected:
-	Const* ptr;
+	LValue* ptr;
 };
 
-Const* PtrType::create() const{
-	return new Pconst(type->create(),type, true);
+UnnamedLValue* PtrType::create() const{
+	return new UnnamedLValue(new PtrType(type),true);
 }
 
 class Arrconst: public Pconst{
 public:
-	Arrconst(int s, Type* t, bool dyn=false):Pconst( (Const* ) (malloc(sizeof(Const)*s)), t, dyn),size(s){}
-	Const* get_element(int i){
+	Arrconst(int s, Type* t):Pconst( (UnnamedLValue* ) (malloc(sizeof(UnnamedLValue)*s)), t ),size(s){}
+	LValue* get_element(int i){
 		return &(ptr[i]);
 	}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Arrconst(" << ptr <<"["<<size<<"]"<<"of type "<< *type <<" ,dynamic:"<<dynamic<< ")";
+		out << "Arrconst(" << ptr <<"["<<size<<"]"<<"of type "<< *type << ")";
 	}
 protected:
 	int size;
 };
 
-Const* ArrType::create() const{
-	return new Arrconst(size,type, true);
+UnnamedLValue* ArrType::create() const{
+	return new UnnamedLValue(new Arrconst(size,type), new ArrType(size,type),true);
 }
 
 class Bconst: public Const {
 public:
-	Bconst(bool b, bool dyn=false):Const(BOOLEAN::getInstance(), dyn),boo(b){}
+	Bconst(bool b):Const(BOOLEAN::getInstance() ),boo(b){}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Bconst(" << boo << " ,dynamic:"<<dynamic<<")";
+		out << "Bconst(" << boo <<")";
 	}
 	virtual value get_value() const override {
 		value v; v.b=boo;
@@ -338,15 +389,15 @@ private:
 	bool boo;
 };
 
-Const* BOOLEAN::create() const{
-	return new Bconst(false, true);
+UnnamedLValue* BOOLEAN::create() const{
+	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
 class Op: public Expr {
 public:
 	Op(Expr *l, std::string o, Expr *r): left(l), op(o), right(r),
 		leftType(nullptr), rightType(nullptr), resType(nullptr) {}
-	Op(Expr *l, std::string o): left(l), op(o), right(nullptr) {}
+	Op(std::string o, Expr *l): left(l), op(o), right(nullptr) {}
 	~Op() { delete left; delete right; }
 	virtual void printOn(std::ostream &out) const override {
 		if(right) out << op << "(" << *left << ", " << *right << ")";
@@ -431,15 +482,6 @@ public:
 			//bool operand-> bool result
 			if(leftType->doCompare(boolType) )
 				resType=boolType;
-		}
-		if(!(op.compare("@"))){
-			resType=new PtrType(leftConst->get_type());
-		}
-		if(!(op.compare("^"))){
-			if(!(leftType->get_name().compare("pointer")) ){
-				PtrType* p = static_cast<PtrType*>(leftType);
-				resType=p->get_type();
-			}
 		}
 		if(!resType){/*TODO ERROR type mismatch*/}
 		return;
@@ -775,20 +817,6 @@ public:
 			bool lb=v.b;
 			return new Bconst(not lb);
 		}
-		if(!(op.compare("@"))) return leftConst;
-
-		if(!(op.compare("^"))) {
-			value v=leftConst->get_value();
-			Const* c=v.con;
-			PtrType *p=static_cast<PtrType*>(leftType);
-			return new Pconst(c,p->get_type());
-		}
-		if(!(op.compare("[]"))){
-			value v = rightConst->get_value();
-			int i=v.i;
-			Arrconst* arr = static_cast<Arrconst*> (leftConst);
-			return arr->get_element(i);
-		}
 		return 0;  // this will never be reached.
 	}
 private:
@@ -798,44 +826,113 @@ private:
 	Expr *right;
 };
 
+class Reference: public Expr{
+public:
+	Reference(LValue* lval):lvalue(lval){}
+	virtual void printOn(std::ostream &out) const override {
+		out << "Reference" << "(" << *lvalue << ")";
+	}
+	virtual Const* eval(){
+		return new Pconst(lvalue,lvalue->get_type());
+	}
+protected:
+	LValue* lvalue;
+};
+
+class Dereference: public LValue{
+public:
+	Dereference(Expr *e):expr(e),con(nullptr){}
+	virtual void printOn(std::ostream &out) const override {
+		out << "Dereference" << "(" << *expr << ")";
+	}
+	virtual Const* eval(){
+		eval_inside();
+		if(con->get_type()->get_name().compare("pointer")){
+			//TODO error incorrect type
+		}
+		value v = con->get_value();
+		return (v.lval)->eval();
+	}
+
+	virtual Type* get_type(){
+		eval_inside();
+		Type* con_ty=con->get_type();
+		if(con_ty->get_name().compare("pointer")){
+			//TODO error incorrect type
+		}
+		PtrType* p_ty=static_cast<PtrType*>(con_ty);
+		return p_ty->get_type();
+	}
+
+	virtual void let(Const* c){
+		eval_inside();
+		if(con->get_type()->get_name().compare("pointer")){
+			//TODO error incorrect type
+		}
+		value v = con->get_value();
+		(v.lval)->let(c);
+	}
+
+protected:
+	void eval_inside(){
+		if(con!=nullptr) {
+			expr->typecheck();
+			con=expr->eval();
+		}
+	}
+	Const* con;
+	Expr *expr;
+};
+
+class Brackets: public LValue{
+public:
+	Brackets(LValue *lval, Expr* e):lvalue(lval),expr(e){}
+	virtual void printOn(std::ostream &out) const override {
+		out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
+	}
+	virtual Const* eval(){
+		return element()->eval();
+	}
+	virtual void let(Const* c){
+		element()->let(c);
+	}
+	virtual Type* get_type(){
+		return element()->get_type();
+	}
+protected:
+	LValue* element(){
+		Type* l_ty = lvalue->get_type();
+		if(l_ty->get_name().compare("array")){
+			//TODO error incorrect type
+		}
+		Const* con= expr->eval();
+		if(!con->get_type()->doCompare(INTEGER::getInstance())){
+			//TODO error incorrect type for array index should be int
+		}
+		value v = con->get_value();
+		int i = v.i;
+		Const* c = lvalue->eval();
+		Arrconst *arr = static_cast<Arrconst*>(c);
+		return arr->get_element(i);
+	}
+	LValue* lvalue;
+	Expr* expr;
+};
+
 class Let: public Stmt { //TODO semantics
 public:
-	Let(Id* i,Expr* e):id(i),expr(e){}
-	~Let(){delete id; delete expr;}
+	Let(LValue* lval,Expr* e):lvalue(lval),expr(e){}
+	~Let(){delete lvalue; delete expr;}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Let(" << *id << ":=" << *expr << ")";
+		out << "Let(" << *lvalue << ":=" << *expr << ")";
 	}
 	virtual void run() const override{
+		expr->typecheck();
 		Const* c = expr->eval();
-		std::map<std::string,Const*>::iterator it;
-		it=globals.find(id->name());
-		if(it==globals.end()){
-			std::map<std::string,Type*>::iterator it2;
-			if(it2==declared.end()){
-				return; //TODO throw error variable not declared
-			}
-			else{
-				if(c->get_type()->doCompare(it2->second) ){
-					globals[id->name()]=c;
-					return;
-				}
-				//TODO throw error type mismatch
-				return;
-			}
-		}
-		else{
-			Const* old=globals[id->name()];
-			if(c->get_type()->doCompare(old->get_type())){
-				delete globals[id->name()];
-				globals[id->name()]=c;
-				return;
-			}
-			//TODO throw error type mismatch
-			return;
-		}
+		lvalue->let(c);
 	}
 private:
-	Id  *id;
+	LValue  *lvalue;
 	Expr *expr;
 };
 
@@ -898,13 +995,13 @@ private:
 
 class New: public Stmt{
 public:
-	New(Expr* e, Id* i):expr(e),id(i){}
-	~New(){delete expr; delete id;}
+	New(LValue* lval, Expr* e):expr(e),lvalue(lval){}
+	~New(){delete expr; delete lvalue;}
 	virtual void printOn(std::ostream &out) const override {
 		if(expr)
-			out << "New( [" << *expr << "] of " << *id << ")";
+			out << "New( [" << *expr << "] of " << *lvalue << ")";
 		else
-			out << "New( [] of " << *id << ")";
+			out << "New( [] of " << *lvalue << ")";
 	}
 
 	virtual void run() const override{
@@ -917,7 +1014,7 @@ public:
 			value v = c->get_value();
 			int i = v.i;
 			if(i<=0) {/*TODO ERROR incorrect type*/}
-			Type* idType=id->get_type();
+			Type* idType=lvalue->get_type();
 			if(idType->get_name().compare("pointer") )
 			{/*TODO ERROR incorrect type*/}
 			PtrType* p=static_cast<PtrType*>(idType);
@@ -926,70 +1023,69 @@ public:
 			{/*TODO ERROR incorrect type*/}
 			ArrType* arrT = static_cast<ArrType*>(t);
 			ArrType* arrT_size = new ArrType(i,arrT->get_type());
-			delete arrT;
 			Pconst *ret = new Pconst(arrT_size->create(), arrT_size );
-			Let(id, ret);
+			lvalue->let(ret);
 		}
 
-		Type* idType=id->get_type();
+		Type* idType=lvalue->get_type();
 		if(idType->get_name().compare("pointer") )
 		{/*TODO ERROR incorrect type*/}
 		PtrType* p=static_cast<PtrType*>(idType);
 		Type* t=p->get_type();
 		Pconst *ret = new Pconst(t->create(), t);
-		Let(id, ret);
+		lvalue->let(ret);
 	}
 
 protected:
 	Expr* expr;
-	Id* id;
+	LValue* lvalue;
 };
 
 
 class Dispose: public Stmt{
 public:
-	Dispose(Id* i):id(i){}
-	~Dispose(){delete id;}
+	Dispose(LValue* lval):lvalue(lval){}
+	~Dispose(){delete lvalue;}
 	virtual void run() const{
-		if(id->get_type()->get_name().compare("pointer"))
+		if(lvalue->get_type()->get_name().compare("pointer"))
 		{/*TODO ERROR incorrect type*/}
-		Const *c = id->eval();
+		Const *c = lvalue->eval();
 		value v = c->get_value();
-		Const* ptr = v.con;
+		LValue* ptr = v.lval;
 		if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
 		delete ptr;
-		Let(id, new Pconst());
+		lvalue->let(new Pconst());
 	}
 	virtual void printOn(std::ostream &out) const override {
-			out << "Dispose( " << *id << ")";
+			out << "Dispose( " << *lvalue << ")";
 	}
 protected:
-	Id *id;
+	LValue *lvalue;
 };
 
 class DisposeArr: public Stmt{
 public:
-	DisposeArr(Id* i):id(i){}
-	~DisposeArr(){delete id;}
+	DisposeArr(LValue* lval):lvalue(lval){}
+	~DisposeArr(){delete lvalue;}
 	virtual void run() const{
-		Type* t=id->get_type();
+		Type* t=lvalue->get_type();
 		if(t->get_name().compare("pointer"))
 		{/*TODO ERROR incorrect type*/}
 		PtrType *pt = static_cast<PtrType*>(t);
 		if(pt->get_name().compare("array"))
 		{/*TODO ERROR incorrect type*/}
-		Const *c = id->eval();
+		Const *c = lvalue->eval();
 		value v = c->get_value();
-		Const* ptr = v.con;
+		LValue* ptr = v.lval;
 		if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
 		delete ptr;
-		Let(id, new Pconst());
+		lvalue->let(new Pconst());
 	}
 	virtual void printOn(std::ostream &out) const override {
-			out << "Dispose[]( " << *id << ")";
+			out << "Dispose[]( " << *lvalue << ")";
 	}
 protected:
-	Id *id;
+	LValue *lvalue;
 };
 template<class T>
 std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
@@ -999,7 +1095,7 @@ std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
 }
 
 template <class T>
-class List: public AST{
+class List: virtual public AST{
 public:
 	List(T *t):list(1,t){}
 	List():list(){}
@@ -1037,6 +1133,8 @@ public:
 	}
 };
 class ExprList: public List<Expr> {
+public:
+	ExprList():List<Expr>(){}
 	ExprList(Expr *e):List<Expr>(e){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "ExprList(" << list << ")";
@@ -1061,7 +1159,8 @@ class Local: public AST{
 
 class Decl: public AST{
 public:
-	Decl(std::string i,std::string ty):id(i),decl_type("unknown"){}
+	Decl(std::string i):id(i),decl_type("unknown"){}
+	Decl(std::string i,std::string ty):id(i),decl_type(ty){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Decl(" << decl_type <<":"<<id<<")";
 	}
@@ -1150,6 +1249,9 @@ public:
 		statements->run();
 	}
 
+	virtual void printOn(std::ostream &out) const override {
+		out << "Body("<<*declarations<<","<<*statements<<")";
+	}
 protected:
 	DeclList* declarations;
 	StmtList* statements;

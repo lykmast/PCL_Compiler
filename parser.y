@@ -7,10 +7,9 @@
 %}
 
 %define parse.error verbose
-%define api.value.type "variant"
 %expect 1
 
-%token<std::string> T_id
+%token<var> T_id
 %token T_var "var"
 %token T_integer "integer"
 %token T_boolean "boolean"
@@ -47,10 +46,10 @@
 %token T_dt "<>"
 %token T_lt "<="
 %token T_gt ">="
-%token<int> T_iconst
-%token<double> T_rconst
-%token<std::string> T_sconst
-%token<char> T_cconst
+%token<numi> T_iconst
+%token<numd> T_rconst
+%token<var> T_sconst
+%token<ch> T_cconst
 
 
 %nonassoc '=' '<' '>' "<=" ">=" "<>"
@@ -62,11 +61,29 @@
 %nonassoc '@'
 %nonassoc BRACKETS
 
-%type<Block*> program body mult_locals local var_decl mult_ids header args mult_formals formal block mult_stmts
-%type<List*>  params mult_exprs
-%type<Stmt*> stmt
-%type<Expr*> expr l_value_ref l_value r_value call
-%type<Type*> type
+%union{
+	Body* body;
+	Stmt* stmt;
+	ExprList* exprList;
+	DeclList* declList;
+	StmtList* stmtList;
+	Expr* expr;
+	Type* type;
+	LValue* lvalue;
+	std::string* var;
+	int numi;
+	double numd;
+	char ch;
+}
+
+%type<body> program body
+%type<stmtList> block mult_stmts
+%type<declList> mult_locals local var_decl mult_ids args mult_formals formal
+%type<exprList> params mult_exprs
+%type<stmt> stmt
+%type<expr> expr r_value call
+%type<lvalue> l_value_ref l_value
+%type<type> type
 
 %%
 
@@ -80,7 +97,7 @@ body:
 
 mult_locals:
  /* nothing */ {$$ = new DeclList();}
-| mult_locals local { $1->append_local($2); }
+| mult_locals local { $1->merge($2); }
 ;
 
 local:
@@ -96,8 +113,8 @@ var_decl:
 ;
 
 mult_ids:
-  T_id {$$ = new DeclList($1);}
-| mult_ids ',' T_id {$1->append(new Decl($3)); $$=$1;}
+  T_id {$$ = new DeclList(new Decl(*$1));}
+| mult_ids ',' T_id {$1->append(new Decl(*$3)); $$=$1;}
 ;
 
 type:
@@ -151,7 +168,7 @@ stmt:
 | "goto" T_id { $$=new Stmt();/*TODO $$ = new Goto($2);*/ }
 | "return" {$$=new Stmt();/*TODO $$ = new Return();*/}
 | "new" '[' expr ']' l_value {$$ = new New($5,$3);}
-| "new" l_value {$$=new New($2);}
+| "new" l_value {$$=new New($2,nullptr);}
 | "dispose" '[' ']' l_value {$$ = new DisposeArr($4);}
 | "dispose" l_value {$$ = new Dispose($2);}
 ;
@@ -161,18 +178,18 @@ expr:
 | r_value {$$ = $1;}
 
 l_value_ref:
-  T_id {$$ = new Id($1);}
+  T_id {$$ = new Id(*$1);}
 | "result" {$$ = new Id("result");}
-| T_sconst {$$ = new Sconst($1);}
-| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
+| T_sconst {$$ = new Sconst(*$1);}
+| l_value_ref '[' expr ']' %prec BRACKETS {$$ = new Brackets($1,$3);}
 | '(' l_value ')' {$$ = $2;}
 
 l_value:
-  expr '^' {$$ = new Op("^",$1);*}
-| T_id {$$ = new Id($1);}
+  expr '^' {$$ = new Dereference($1);}
+| T_id {$$ = new Id(*$1);}
 | "result" {$$ = new Id("result");}
-| T_sconst {$$ = new Sconst($1);}
-| l_value '[' expr ']' %prec BRACKETS {$$ = new Op("[]",$1,$3);}
+| T_sconst {$$ = new Sconst(*$1);}
+| l_value '[' expr ']' %prec BRACKETS {$$ = new Brackets($1,$3);}
 | '(' l_value ')'{$$ = $2;}
 ;
 
@@ -183,9 +200,9 @@ r_value:
 | "true" {$$ = new Bconst("true");}
 | "false" {$$ = new Bconst("false");}
 | '(' r_value ')' {$$ = $2;}
-| "nil" {$$ = Pconst(); /*pointer constant*/}
+| "nil" {$$ = new Pconst(); /*pointer constant*/}
 | call {$$ = $1;}
-| '@' l_value_ref {$$ = new Op("@", $2);}
+| '@' l_value_ref {$$ = new Reference($2);}
 | expr '+' expr {$$ = new Op($1,"+",$3);}
 | expr '-' expr {$$ = new Op($1,"-",$3);}
 | expr '*' expr {$$ = new Op($1,"*",$3);}
@@ -211,7 +228,7 @@ call:
 
 params:
 /* nothing */ { $$ = new ExprList();}
-|mult_exprs {$$ = $1}
+|mult_exprs {$$ = $1;}
 ;
 
 mult_exprs:
