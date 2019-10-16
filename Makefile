@@ -22,12 +22,12 @@ default: pcl
 pcl_lexer.cpp:pcl_lexer.l
 	flex -s -o pcl_lexer.cpp pcl_lexer.l
 
-pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp
+pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp
 
 parser.hpp parser.cpp: parser.y
 	bison -dv -o parser.cpp parser.y
 
-parser.o: parser.cpp pcl_lexer.hpp
+parser.o: parser.cpp pcl_lexer.hpp ast.hpp
 
 pcl: pcl_lexer.o parser.o
 	$(CC) $(CFLAGS) -o pcl pcl_lexer.o parser.o
