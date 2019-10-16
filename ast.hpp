@@ -138,8 +138,8 @@ protected:
 
 class ArrType: public PtrType{
 public:
-	ArrType(int s,Type* t):size(s),PtrType("array",t){}
-	ArrType(Type* t):size(-1),PtrType("array",t){}
+	ArrType(int s,Type* t):PtrType("array",t),size(s){}
+	ArrType(Type* t):PtrType("array",t),size(-1){}
 	~ArrType(){if(type->should_delete()) delete type;}
 	virtual UnnamedLValue* create() const;
 	int get_size(){return size;}
@@ -267,23 +267,6 @@ protected:
 	Type* type;
 };
 
-class Sconst: public UnnamedLValue {
-public:
-	Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::getInstance())) {
-		str=(char*)(malloc(sizeof(char)*(s.size()-1)));
-		s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
-		str[s.size()-2]='\0';
-	}
-	virtual void printOn(std::ostream &out) const override {
-		out << "Sconst(" << str << ")";
-	}
-	virtual value get_value() const override {
-		value v; v.s=str;
-		return v;
-	}
-private:
-	char *str;
-};
 
 class Iconst: public Const {
 public:
@@ -358,17 +341,43 @@ UnnamedLValue* PtrType::create() const{
 	return new UnnamedLValue(new PtrType(type),true);
 }
 
-class Arrconst: public Pconst{
+class Arrconst: public Const{
 public:
-	Arrconst(int s, Type* t):Pconst( (UnnamedLValue* ) (malloc(sizeof(UnnamedLValue)*s)), t ),size(s){}
+	Arrconst(int s, Type* t):Const(  t ),arr((UnnamedLValue** ) (malloc(sizeof(UnnamedLValue*)*s))),size(s){
+		for(int i=0;i<s;i++){
+			arr[i]=new UnnamedLValue(t);
+		}
+	}
 	LValue* get_element(int i){
-		return &(ptr[i]);
+		return arr[i];
+	}
+	void fromString(char* str){
+		for(int i=0; i<size;i++){
+			arr[i]->let(new Cconst(str[i]));
+		}
 	}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Arrconst(" << ptr <<"["<<size<<"]"<<"of type "<< *type << ")";
+		out << "Arrconst(" << arr <<"["<<size<<"]"<<"of type "<< *type << ")";
+	}
+	virtual value get_value() const{
+		value v;
+		v.lval=arr[0];
+		return v;
 	}
 protected:
+	UnnamedLValue** arr;
 	int size;
+};
+
+class Sconst: public UnnamedLValue {
+public:
+	Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::getInstance())) {
+		char* str=(char*)(malloc(sizeof(char)*(s.size()-1)));
+		s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
+		str[s.size()-2]='\0';
+		Const* arr = new Arrconst(s.size()-1,CHARACTER::getInstance());
+		let(arr);
+	}
 };
 
 UnnamedLValue* ArrType::create() const{
@@ -820,10 +829,10 @@ public:
 		return 0;  // this will never be reached.
 	}
 private:
-	Type *leftType,*rightType,*resType;
 	Expr *left;
 	std::string op;
 	Expr *right;
+	Type *leftType,*rightType,*resType;
 };
 
 class Reference: public Expr{
@@ -841,7 +850,7 @@ protected:
 
 class Dereference: public LValue{
 public:
-	Dereference(Expr *e):expr(e),con(nullptr){}
+	Dereference(Expr *e):con(nullptr),expr(e){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Dereference" << "(" << *expr << ")";
 	}
