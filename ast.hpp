@@ -282,7 +282,7 @@ private:
 	int num;
 };
 
-UnnamedLValue* INTEGER::create() const{
+inline UnnamedLValue* INTEGER::create() const{
 	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
@@ -300,7 +300,7 @@ private:
 	double num;
 };
 
-UnnamedLValue* REAL::create() const{
+inline UnnamedLValue* REAL::create() const{
 	return new UnnamedLValue(REAL::getInstance(),true);
 }
 
@@ -318,7 +318,7 @@ private:
 	char ch;
 };
 
-UnnamedLValue* CHARACTER::create() const{
+inline UnnamedLValue* CHARACTER::create() const{
 	return new UnnamedLValue(CHARACTER::getInstance(),true);
 }
 
@@ -337,7 +337,7 @@ protected:
 	LValue* ptr;
 };
 
-UnnamedLValue* PtrType::create() const{
+inline UnnamedLValue* PtrType::create() const{
 	return new UnnamedLValue(new PtrType(type),true);
 }
 
@@ -380,7 +380,7 @@ public:
 	}
 };
 
-UnnamedLValue* ArrType::create() const{
+inline UnnamedLValue* ArrType::create() const{
 	return new UnnamedLValue(new Arrconst(size,type), new ArrType(size,type),true);
 }
 
@@ -398,7 +398,7 @@ private:
 	bool boo;
 };
 
-UnnamedLValue* BOOLEAN::create() const{
+inline UnnamedLValue* BOOLEAN::create() const{
 	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
