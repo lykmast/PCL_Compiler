@@ -3,6 +3,8 @@
 #include "pcl_lexer.hpp"
 #include "ast.hpp"
 #include <string>
+std::map<std::string, Const*> globals; // map variable names to values
+std::map<std::string, Type*> declared; // map variable names to values
 
 %}
 
