@@ -111,11 +111,11 @@ local:
 
 var_decl:
   mult_ids ':' type ';' {$1->toVar($3); $$ = $1;}
-| var_decl ';' mult_ids ':' type {$3->toVar($5); $1->merge($3); $$=$1;}
+| var_decl mult_ids ':' type ';' {$2->toVar($4); $1->merge($2); $$=$1;}
 ;
 
 mult_ids:
-  T_id {$$ = new DeclList(new Decl(*$1));}
+  T_id { $$ = new DeclList(new Decl(*$1));}
 | mult_ids ',' T_id {$1->append(new Decl(*$3)); $$=$1;}
 ;
 
