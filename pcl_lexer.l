@@ -6,6 +6,7 @@
 	#include "ast.hpp"
 	#include "pcl_lexer.hpp"
 	#include "parser.hpp"
+	#include <string>
 %}
 
 L [a-zA-Z]
@@ -45,11 +46,11 @@ W [ \t\r\n]
 "dispose" {return T_dispose;}
 "new" {return T_new;}
 "result" {return T_result;}
-{L}(_|{L}|{D})* {return T_id;}
-{D}+\.{D}+(e(\-|\+)?{D}+)? {return T_rconst;}
-{D}+ {return T_iconst;}
-\"([^\"\\]|{E})*\" {return T_sconst;/*"*/}
-\'([^\'\\]|{E})\'	{return T_cconst;/*'*/}
+{L}(_|{L}|{D})* {std::string *s=new std::string(yytext);yylval.var=s;return T_id;}
+{D}+\.{D}+(e(\-|\+)?{D}+)? {yylval.numd=atof(yytext);return T_rconst;}
+{D}+ {yylval.numi=atoi(yytext);return T_iconst;}
+\"([^\"\\]|{E})*\" {std::string* s=new std::string(yytext);yylval.var=s;return T_sconst;/*"*/}
+\'([^\'\\]|{E})\'	{yylval.ch=yytext[0];return T_cconst;/*'*/}
 ":=" {return T_assign;}
 "<>" {return T_dt;}
 "<=" {return T_lt;}
