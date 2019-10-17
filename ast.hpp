@@ -1099,7 +1099,7 @@ protected:
 template<class T>
 std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
 	for(auto p :v)
-	out<<*p<<",";
+		out<<*p<<",";
 	return out;
 }
 
@@ -1109,9 +1109,11 @@ public:
 	List(T *t):list(1,t){}
 	List():list(){}
 	~List(){
-		for(auto p:list)
-		delete p;
 		list.clear();
+	}
+	void destroy(){
+		for(auto p:list)
+			delete p;
 	}
 	virtual void printOn(std::ostream &out) const override {
 		out << "List(" << list << ")";
@@ -1196,9 +1198,9 @@ public:
 	VarDecl(Decl* d,Type* t):Decl(d->get_id(),"var"),type(t){delete d;}
 	virtual void printOn(std::ostream &out) const override {
 		if(type)
-		out << "VarDecl(" <<id<<"of type "<< *type << ")";
+		out << "VarDecl(" <<id<<" of type "<< *type << ")";
 		else
-		out << "VarDecl(" <<id<<"of type NOTSET)";
+		out << "VarDecl(" <<id<<" of type NOTSET)";
 	}
 	virtual void run() const override{
 		declared[id]=type;
@@ -1222,9 +1224,9 @@ public:
 	DeclList(Decl* d):List<Decl>(d){}
 	DeclList():List<Decl>(){}
 	void toVar(Type* t){
-		for(auto p:list){
-			Decl *d=new VarDecl(p,t);
-			p=d;
+		for(auto p=list.begin();p!=list.end();p++){
+			Decl *d=new VarDecl(*p,t);
+			*p=d;
 		}
 	}
 	void run() const{
@@ -1233,15 +1235,15 @@ public:
 	}
 
 	void toLabel(){
-		for(auto p:list){
-			Decl *d=new LabelDecl(p);
-			p=d;
+		for(auto p=list.begin();p!=list.end();p++){
+			Decl *d=new LabelDecl(*p);
+			*p=d;
 		}
 	}
 	void toFormal(Type* t, bool ref){
-		for(auto p:list){
-			Decl *d=new FormalDecl(p,t,ref);
-			p=d;
+		for(auto p=list.begin();p!=list.end();p++){
+			Decl *d=new FormalDecl(*p,t,ref);
+			*p=d;
 		}
 	}
 };
