@@ -180,6 +180,7 @@ public:
 	virtual void printOn(std::ostream &out) const =0;
 	virtual Const* eval() override{return this;}
 	virtual value get_value() const=0;
+	virtual Const* copyToType() const {return nullptr;}
 protected:
 	Type* type;
 };
@@ -214,10 +215,6 @@ public:
 
 	virtual void let(Const* c){
 		bool hasValue=lookup();
-		if(!(c->get_type()->doCompare(this->get_type())) ){
-		//TODO throw error type mismatch
-			return;
-		}
 		if(hasValue) delete globals[name];
 		globals[name]=c;
 	}
@@ -268,23 +265,6 @@ protected:
 };
 
 
-class Iconst: public Const {
-public:
-	Iconst(int n):Const(INTEGER::getInstance()),num(n){}
-	virtual void printOn(std::ostream &out) const override {
-		out << "Iconst(" << num << ")";
-	}
-	virtual value get_value() const override {
-		value v; v.i=num;
-		return v;
-	}
-private:
-	int num;
-};
-
-inline UnnamedLValue* INTEGER::create() const{
-	return new UnnamedLValue(INTEGER::getInstance(),true);
-}
 
 class Rconst: public Const {
 public:
@@ -302,6 +282,27 @@ private:
 
 inline UnnamedLValue* REAL::create() const{
 	return new UnnamedLValue(REAL::getInstance(),true);
+}
+
+class Iconst: public Const {
+public:
+	Iconst(int n):Const(INTEGER::getInstance()),num(n){}
+	virtual void printOn(std::ostream &out) const override {
+		out << "Iconst(" << num << ")";
+	}
+	virtual value get_value() const override {
+		value v; v.i=num;
+		return v;
+	}
+	virtual Const* copyToType() const{
+		return new Rconst(num*1.0);
+	}
+private:
+	int num;
+};
+
+inline UnnamedLValue* INTEGER::create() const{
+	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
 class Cconst: public Const {
@@ -333,6 +334,15 @@ public:
 		value v; v.lval=ptr;
 		return v;
 	}
+
+	virtual Const* copyToType() const{
+		Type* temp=static_cast<PtrType*>(type)->get_type();
+		ArrType* arrType=static_cast<ArrType*>(temp);
+		Type* inType=arrType->get_type();
+
+		return new Pconst(ptr,new PtrType(ArrType(inType)));
+	}
+
 protected:
 	LValue* ptr;
 };
@@ -654,7 +664,7 @@ public:
 				ri=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst(li/ri*lr/rr);
+				return new Rconst((li/rr)*(lr/ri));
 			}
 		}
 
@@ -935,12 +945,44 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Let(" << *lvalue << ":=" << *expr << ")";
 	}
+
 	virtual void run() const override{
 		expr->typecheck();
 		Const* c = expr->eval();
-		lvalue->let(c);
+		Type*lType=lvalue->get_type();
+		Type*rType=c->get_type();
+		if(lType->doCompare(rType))
+			lvalue->let(c);
+		else if(typecheck(lType,rType)){
+			Const* n=c->copyToType();
+			lvalue->let(n);
+			delete c;
+		}
+		else{
+			//TODO error type mismatch
+		}
+
 	}
 private:
+	bool typecheck (Type*lType,Type*rType) const{
+		if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
+			return true;
+		if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
+			PtrType* lpType=static_cast<PtrType*>(lType);
+			PtrType* rpType=static_cast<PtrType*>(rType);
+			Type* linType=lpType->get_type();
+			Type* rinType=rpType->get_type();
+			if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
+				ArrType* larrType=static_cast<ArrType*>(linType);
+				ArrType* rarrType=static_cast<ArrType*>(rinType);
+				if(larrType->get_size()!=-1){
+					if(larrType->get_type()->doCompare(rarrType->get_type()))
+						return true;
+				}
+			}
+		}
+		return false;
+	}
 	LValue  *lvalue;
 	Expr *expr;
 };
@@ -1103,6 +1145,15 @@ std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
 	return out;
 }
 
+template<class T>
+std::ostream& operator <<(std::ostream &out,const std::map<std::string,T*> m) {
+	out<<"[";
+	for(auto p :m)
+		out<<"<"<<p.first<<": "<<*(p.second)<<">,";
+	out<<"]";
+	return out;
+}
+
 template <class T>
 class List: virtual public AST{
 public:
@@ -1252,11 +1303,9 @@ class Body: public AST{
 public:
 	Body(DeclList* d, StmtList* s):declarations(d),statements(s){}
 	~Body(){delete declarations; delete statements;}
-	void declare() const{
-		declarations->run();
-	}
 
 	void run() const{
+		declarations->run();
 		statements->run();
 	}
 
