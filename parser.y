@@ -85,12 +85,13 @@ std::map<std::string, Type*> declared; // map variable names to values
 %type<stmt> stmt
 %type<expr> expr r_value call
 %type<lvalue> l_value_ref l_value
-%type<type> type
+%type<type> type full_type
 
 %%
 
 program:
-  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/}
+  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/$4->run();
+	std::cout<<"DECLARED: "<<declared<<std::endl<<"GLOBALS: "<<globals<<std::endl;}
 ;
 
 body:
@@ -124,9 +125,18 @@ type:
 | "real"  {$$ = REAL::getInstance(); }
 | "boolean" {$$ =BOOLEAN::getInstance(); }
 | "char" {$$ = CHARACTER::getInstance(); }
-| "array" '[' T_iconst ']' "of" type {$$ = new ArrType($3,$6);}
-| "array" "of" type {$$ = new ArrType($3);}
-| '^' type {$$ = new PtrType($2);}
+| "array" '[' T_iconst ']' "of" full_type {$$ = new ArrType($3,$6);}
+| "array" "of" full_type {$$ = new ArrType($3);}
+| '^' full_type {$$ = new PtrType($2);}
+;
+
+full_type:
+"integer" {$$=INTEGER::getInstance();}
+| "real"  {$$ = REAL::getInstance(); }
+| "boolean" {$$ =BOOLEAN::getInstance(); }
+| "char" {$$ = CHARACTER::getInstance(); }
+| "array" '[' T_iconst ']' "of" full_type {$$ = new ArrType($3,$6);}
+| '^' full_type {$$ = new PtrType($2);}
 ;
 
 header:
