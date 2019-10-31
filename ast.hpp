@@ -128,8 +128,10 @@ public:
 		return true;
 	}
 	virtual bool doCompare(Type* t) override{
-		if (!(name.compare(t->get_name())))
-			return type->doCompare(t->get_type());
+		if (!(name.compare(t->get_name()))){
+			PtrType* pTy=static_cast<PtrType*>(t);
+			return type->doCompare(pTy->get_type());
+		}
 		return false;
 	}
 protected:
@@ -247,7 +249,7 @@ public:
 	UnnamedLValue(Const* val, Type* ty,bool dyn=false):LValue(dyn),value(val),type(ty){}
 	~UnnamedLValue(){delete value;}
 	virtual void printOn(std::ostream &out) const override {
-		out << "UnnamedLValue(" << value<<","<<type << ")";
+		out << "UnnamedLValue(" << *value<<","<<*type << ")";
 	}
 	virtual void let(Const* c) override{
 		if(value) delete value;
@@ -430,10 +432,12 @@ public:
 		Type* intType=INTEGER::getInstance();
 		Type* realType=REAL::getInstance();
 		Type* boolType=BOOLEAN::getInstance();
+		left->typecheck();
 		Const *leftConst=left->eval();
 		leftType=leftConst->get_type();
 
 		if(right!=nullptr){//BinOps
+			right->typecheck();
 			Const *rightConst=right->eval();
 			rightType=rightConst->get_type();
 			if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
@@ -467,7 +471,6 @@ public:
 			if(!(op.compare("=")) or !(op.compare("<>")) or !(op.compare("<="))
 			or !(op.compare(">=")) or !(op.compare("<")) or !(op.compare(">")) ){
 			//real or int operands-> bool result
-
 				if( (leftType->doCompare(realType) or leftType->doCompare(intType))
 				and (rightType->doCompare(realType) or rightType->doCompare(intType)))
 				//is a number (real or int)
@@ -894,10 +897,8 @@ public:
 
 protected:
 	void eval_inside(){
-		if(con!=nullptr) {
-			expr->typecheck();
-			con=expr->eval();
-		}
+		expr->typecheck();
+		con=expr->eval();
 	}
 	Const* con;
 	Expr *expr;
@@ -951,8 +952,9 @@ public:
 		Const* c = expr->eval();
 		Type*lType=lvalue->get_type();
 		Type*rType=c->get_type();
-		if(lType->doCompare(rType))
+		if(lType->doCompare(rType)){
 			lvalue->let(c);
+		}
 		else if(typecheck(lType,rType)){
 			Const* n=c->copyToType();
 			lvalue->let(n);
@@ -1255,6 +1257,11 @@ public:
 	}
 	virtual void run() const override{
 		declared[id]=type;
+		if(!type->get_name().compare("array")){
+			ArrType* arrT = static_cast<ArrType*>(type);
+			Const* arr = new Arrconst(arrT->get_size(),arrT->get_type());
+			globals[id]=arr;
+		}
 	}
 	void set_type(Type* ty){type=ty;}
 protected:
