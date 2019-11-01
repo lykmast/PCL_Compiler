@@ -19,6 +19,7 @@ class AST {
 public:
 	virtual ~AST() {}
 	virtual void printOn(std::ostream &out) const = 0;
+	virtual void sem(){}
 };
 
 inline std::ostream& operator<< (std::ostream &out, const AST &t) {
@@ -424,21 +425,19 @@ public:
 		else  out << op << "(" << *left << ")";
 	}
 
-	virtual void typecheck() override{
+	virtual void sem() override{
 	// sets leftType, rightType and resType fields
 	// it should be run only once even when we have repeated evals
 	// e.g in while
 		Type* intType=INTEGER::getInstance();
 		Type* realType=REAL::getInstance();
 		Type* boolType=BOOLEAN::getInstance();
-		left->typecheck();
-		Const *leftConst=left->eval();
-		leftType=leftConst->get_type();
+		left->sem();
+		leftType=left->get_type();
 
 		if(right!=nullptr){//BinOps
-			right->typecheck();
-			Const *rightConst=right->eval();
-			rightType=rightConst->get_type();
+			right->sem();
+			rightType=right->get_type();
 			if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
 			//real or int operands-> real or int result
 				if( (leftType->doCompare(realType) or leftType->doCompare(intType))
@@ -514,11 +513,11 @@ public:
 		// before the first eval of any op, there must have been one typecheck to
 		// fill resType, leftType, rightType
 		Type* realType=REAL::getInstance();
-		left->typecheck();
+		left->sem();
 		Const *leftConst=left->eval();
 		Const *rightConst=nullptr;
 		if(right){
-			right->typecheck();
+			right->sem();
 			rightConst=right->eval();
 		}
 		if(!(op.compare("+")) and right){
@@ -868,44 +867,36 @@ protected:
 
 class Dereference: public LValue{
 public:
-	Dereference(Expr *e):con(nullptr),expr(e){}
+	Dereference(Expr *e):expr(e){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Dereference" << "(" << *expr << ")";
 	}
-	virtual Const* eval(){
-		eval_inside();
-		if(con->get_type()->get_name().compare("pointer")){
+	virtual void sem() override{
+		expr->sem();
+		Type* ty=expr->get_type();
+		if(ty->get_name().compare("pointer")){
 			//TODO error incorrect type
 		}
-		value v = con->get_value();
+	}
+	virtual Const* eval(){
+		Const* c = expr->eval();
+		value v = c->get_value();
 		return (v.lval)->eval();
 	}
 
 	virtual Type* get_type(){
-		eval_inside();
-		Type* con_ty=con->get_type();
-		if(con_ty->get_name().compare("pointer")){
-			//TODO error incorrect type
-		}
+		Type* con_ty=expr->get_type();
 		PtrType* p_ty=static_cast<PtrType*>(con_ty);
 		return p_ty->get_type();
 	}
 
 	virtual void let(Const* c){
-		eval_inside();
-		if(con->get_type()->get_name().compare("pointer")){
-			//TODO error incorrect type
-		}
+		Const* con = expr->eval();
 		value v = con->get_value();
 		(v.lval)->let(c);
 	}
 
 protected:
-	void eval_inside(){
-		expr->typecheck();
-		con=expr->eval();
-	}
-	Const* con;
 	Expr *expr;
 };
 
@@ -914,6 +905,15 @@ public:
 	Brackets(LValue *lval, Expr* e):lvalue(lval),expr(e){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
+	}
+	virtual void sem() override{
+		Type* l_ty = lvalue->get_type();
+		if(l_ty->get_name().compare("array")){
+			//TODO error incorrect type
+		}
+		if(!expr->get_type()->doCompare(INTEGER::getInstance())){
+			//TODO error incorrect type for array index should be int
+		}
 	}
 	virtual Const* eval(){
 		return element()->eval();
@@ -926,15 +926,7 @@ public:
 	}
 protected:
 	LValue* element(){
-		Type* l_ty = lvalue->get_type();
-		if(l_ty->get_name().compare("array")){
-			//TODO error incorrect type
-		}
-		Const* con= expr->eval();
-		if(!con->get_type()->doCompare(INTEGER::getInstance())){
-			//TODO error incorrect type for array index should be int
-		}
-		value v = con->get_value();
+		value v = expr->eval()->get_value();
 		int i = v.i;
 		Const* c = lvalue->eval();
 		Arrconst *arr = static_cast<Arrconst*>(c);
@@ -946,34 +938,19 @@ protected:
 
 class Let: public Stmt { //TODO semantics
 public:
-	Let(LValue* lval,Expr* e):lvalue(lval),expr(e){}
+	Let(LValue* lval,Expr* e):lvalue(lval),expr(e),different_types(false){}
 	~Let(){delete lvalue; delete expr;}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Let(" << *lvalue << ":=" << *expr << ")";
 	}
-
-	virtual void run() const override{
-		expr->typecheck();
-		Const* c = expr->eval();
-		Type*lType=lvalue->get_type();
-		Type*rType=c->get_type();
-		if(lType->doCompare(rType)){
-			lvalue->let(c);
-		}
-		else if(typecheck(lType,rType)){
-			Const* n=c->copyToType();
-			lvalue->let(n);
-			delete c;
-		}
-		else{
-			//TODO error type mismatch
-		}
-
-	}
-private:
-	bool typecheck (Type*lType,Type*rType) const{
+	virtual void sem() override{
+		expr->sem();
+		Type* lType = lvalue->get_type();
+		Type* rType = expr->get_type();
+		if(lType->doCompare(rType)) return;
+		else different_types=true;
 		if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
-			return true;
+			return;
 		if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
 			PtrType* lpType=static_cast<PtrType*>(lType);
 			PtrType* rpType=static_cast<PtrType*>(rType);
@@ -982,16 +959,30 @@ private:
 			if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
 				ArrType* larrType=static_cast<ArrType*>(linType);
 				ArrType* rarrType=static_cast<ArrType*>(rinType);
-				if(larrType->get_size()!=-1){
+				if(rarrType->get_size()!=-1){
 					if(larrType->get_type()->doCompare(rarrType->get_type()))
-						return true;
+						return;
 				}
 			}
 		}
-		return false;
+		/*TODO error type mismatch*/
 	}
+
+	virtual void run() const override{
+		Const* c = expr->eval();
+		if(!different_types){
+			lvalue->let(c);
+		}
+		else{
+			Const* n=c->copyToType();
+			lvalue->let(n);
+			delete c;
+		}
+	}
+private:
 	LValue  *lvalue;
 	Expr *expr;
+	bool different_types;
 };
 
 class If: public Stmt {
@@ -1003,15 +994,18 @@ public:
 		else
 		out << "If(" << *expr << "then" << *stmt1 << ")";
 	}
+	virtual void sem() override{
+		expr->sem();
+		if(!(expr->get_type()==BOOLEAN::getInstance()))
+			{/*TODO ERROR incorrect type*/}
+		stmt1->sem();
+		if(stmt2)
+			stmt2->sem();
+	}
 	virtual void run() const override{
-		expr->typecheck();
 		Const * c= expr->eval();
-		bool e=false;
-		if(c->get_type()==BOOLEAN::getInstance()){
-			value v=c->get_value();
-			e = v.b;
-		}
-		else{/*TODO ERROR incorrect type*/}
+		value v=c->get_value();
+		bool e = v.b;
 		if(e) stmt1->run();
 		else if (stmt2) stmt2->run();
 	}
@@ -1026,24 +1020,21 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "While(" << *expr << "do" << *stmt << ")";
 	}
+	virtual void sem() override{
+		expr->sem();
+		if(!(expr->get_type()==BOOLEAN::getInstance()))
+			{/*TODO ERROR incorrect type*/}
+		stmt->sem();
+	}
 	virtual void run() const override{
-		expr->typecheck();
 		Const * c= expr->eval();
-		bool e=false;
-		if(c->get_type()==BOOLEAN::getInstance()){
-			value v=c->get_value();
-			e = v.b;
-		}
-		else{/*TODO ERROR incorrect type*/}
+		value v=c->get_value();
+		bool e = v.b;
 		while(e) {
 			stmt->run();
-			Const * c= expr->eval();
-			e=false;
-			if(c->get_type()==BOOLEAN::getInstance()){
-				value v=c->get_value();
-				e = v.b;
-			}
-			else{/*TODO ERROR incorrect type*/}
+			c= expr->eval();
+			value v=c->get_value();
+			e = v.b;
 		}
 	}
 private:
@@ -1057,21 +1048,17 @@ public:
 	~New(){delete expr; delete lvalue;}
 	virtual void printOn(std::ostream &out) const override {
 		if(expr)
-			out << "New( [" << *expr << "] of " << *lvalue << ")";
+			out << "New( [" << *expr << "] " << *lvalue << ")";
 		else
 			out << "New( [] of " << *lvalue << ")";
 	}
 
-	virtual void run() const override{
+	virtual void sem() override{
 		if(expr){
-			expr->typecheck();
-			Const* c= expr->eval();
-			if(!(c->get_type()->doCompare(INTEGER::getInstance())) ){
+			expr->sem();
+			if(!(expr->get_type()->doCompare(INTEGER::getInstance())) ){
 				/*TODO ERROR incorrect type*/
 			}
-			value v = c->get_value();
-			int i = v.i;
-			if(i<=0) {/*TODO ERROR incorrect type*/}
 			Type* idType=lvalue->get_type();
 			if(idType->get_name().compare("pointer") )
 			{/*TODO ERROR incorrect type*/}
@@ -1079,19 +1066,34 @@ public:
 			Type* t=p->get_type();
 			if(t->get_name().compare("array") )
 			{/*TODO ERROR incorrect type*/}
+		}
+		else{
+			Type* idType=lvalue->get_type();
+			if(idType->get_name().compare("pointer") )
+			{/*TODO ERROR incorrect type*/}
+		}
+	}
+	virtual void run() const override{
+		if(expr){
+			Const* c= expr->eval();
+			value v = c->get_value();
+			int i = v.i;
+			if(i<=0) {/*TODO ERROR wrong value*/}
+			Type* idType=lvalue->get_type();
+			PtrType* p=static_cast<PtrType*>(idType);
+			Type* t=p->get_type();
 			ArrType* arrT = static_cast<ArrType*>(t);
 			ArrType* arrT_size = new ArrType(i,arrT->get_type());
 			Pconst *ret = new Pconst(arrT_size->create(), arrT_size );
 			lvalue->let(ret);
 		}
-
-		Type* idType=lvalue->get_type();
-		if(idType->get_name().compare("pointer") )
-		{/*TODO ERROR incorrect type*/}
-		PtrType* p=static_cast<PtrType*>(idType);
-		Type* t=p->get_type();
-		Pconst *ret = new Pconst(t->create(), t);
-		lvalue->let(ret);
+		else{
+			Type* idType=lvalue->get_type();
+			PtrType* p=static_cast<PtrType*>(idType);
+			Type* t=p->get_type();
+			Pconst *ret = new Pconst(t->create(), t);
+			lvalue->let(ret);
+		}
 	}
 
 protected:
@@ -1104,13 +1106,15 @@ class Dispose: public Stmt{
 public:
 	Dispose(LValue* lval):lvalue(lval){}
 	~Dispose(){delete lvalue;}
-	virtual void run() const{
+	virtual void sem() override{
 		if(lvalue->get_type()->get_name().compare("pointer"))
 		{/*TODO ERROR incorrect type*/}
+	}
+	virtual void run() const{
 		Const *c = lvalue->eval();
 		value v = c->get_value();
 		LValue* ptr = v.lval;
-		if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
+		if(!(ptr->isDynamic())){/*TODO ERROR non dynamic pointer (RUNTIME)*/}
 		delete ptr;
 		lvalue->let(new Pconst());
 	}
@@ -1125,17 +1129,19 @@ class DisposeArr: public Stmt{
 public:
 	DisposeArr(LValue* lval):lvalue(lval){}
 	~DisposeArr(){delete lvalue;}
-	virtual void run() const{
+	virtual void sem() override{
 		Type* t=lvalue->get_type();
 		if(t->get_name().compare("pointer"))
 		{/*TODO ERROR incorrect type*/}
 		PtrType *pt = static_cast<PtrType*>(t);
 		if(pt->get_name().compare("array"))
 		{/*TODO ERROR incorrect type*/}
+	}
+	virtual void run() const{
 		Const *c = lvalue->eval();
 		value v = c->get_value();
 		LValue* ptr = v.lval;
-		if(!(ptr->isDynamic())){/*TODO ERROR incorrect type*/}
+		if(!(ptr->isDynamic())){/*TODO ERROR non dynamic pointer (RUNTIME)*/}
 		delete ptr;
 		lvalue->let(new Pconst());
 	}
@@ -1173,6 +1179,10 @@ public:
 		for(auto p:list)
 			delete p;
 	}
+	virtual void sem() {
+		for(auto p:list)
+			p->sem();
+	}
 	virtual void printOn(std::ostream &out) const override {
 		out << "List(" << list << ")";
 	}
@@ -1195,6 +1205,11 @@ public:
 	StmtList():List<Stmt>(){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "StmtList(" << list << ")";
+	}
+	virtual void sem() override{
+		for(auto p:list){
+			p->sem();
+		}
 	}
 	virtual void run() const{
 		for(auto p:list)
@@ -1316,8 +1331,12 @@ public:
 	Body(DeclList* d, StmtList* s):declarations(d),statements(s){}
 	~Body(){delete declarations; delete statements;}
 
-	void run() const{
+	virtual void sem() const{
 		declarations->run();
+		statements->sem();
+	}
+
+	void run() const{
 		statements->run();
 	}
 
