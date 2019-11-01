@@ -163,7 +163,7 @@ extern std::map<std::string, Type*> declared; // map variable names to values
 class Expr: public AST {
 public:
 	virtual Const* eval() = 0;
-	virtual void typecheck() {};
+	virtual Type* get_type()=0;
 };
 
 class Stmt: virtual public AST {
@@ -178,7 +178,7 @@ class Const: public Expr{
 public:
 	Const(Type* ty):type(ty){}
 	~Const(){if(type->should_delete()) delete type;}
-	Type* get_type(){return type;}
+	virtual Type* get_type() override{return type;}
 	virtual void printOn(std::ostream &out) const =0;
 	virtual Const* eval() override{return this;}
 	virtual value get_value() const=0;
@@ -193,7 +193,6 @@ class LValue: public Expr{
 public:
 	LValue(bool dyn=false):dynamic(dyn){}
 	virtual void let(Const* c)=0;
-	virtual Type* get_type()=0;
 	bool isDynamic(){return dynamic;}
 protected:
 	bool dynamic;
@@ -841,6 +840,9 @@ public:
 		}
 		return 0;  // this will never be reached.
 	}
+	virtual Type* get_type() override{
+		return resType;
+	}
 private:
 	Expr *left;
 	std::string op;
@@ -853,6 +855,9 @@ public:
 	Reference(LValue* lval):lvalue(lval){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Reference" << "(" << *lvalue << ")";
+	}
+	virtual Type* get_type(){
+		return new PtrType(lvalue->get_type());
 	}
 	virtual Const* eval(){
 		return new Pconst(lvalue,lvalue->get_type());
