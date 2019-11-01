@@ -15,6 +15,14 @@ union value{
 	LValue* lval;
 };
 
+
+template<class T>
+std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
+	for(auto p :v)
+		out<<*p<<",";
+	return out;
+}
+
 class AST {
 public:
 	virtual ~AST() {}
@@ -249,7 +257,10 @@ public:
 	UnnamedLValue(Const* val, Type* ty,bool dyn=false):LValue(dyn),value(val),type(ty){}
 	~UnnamedLValue(){delete value;}
 	virtual void printOn(std::ostream &out) const override {
-		out << "UnnamedLValue(" << *value<<","<<*type << ")";
+		if(value)
+			out << "UnnamedLValue(" << *value<<","<<*type << ")";
+		else
+			out << "UnnamedLValue(EMPTY, "<<*type << ")";
 	}
 	virtual void let(Const* c) override{
 		if(value) delete value;
@@ -355,10 +366,16 @@ inline UnnamedLValue* PtrType::create() const{
 
 class Arrconst: public Const{
 public:
-	Arrconst(int s, Type* t):Const(  t ),arr((UnnamedLValue** ) (malloc(sizeof(UnnamedLValue*)*s))),size(s){
+	Arrconst(int s, Type* t):Const(  t ),size(s){
+		if(s<0){/*TODO error wrong value*/}
+		arr.resize(s);
 		for(int i=0;i<s;i++){
 			arr[i]=new UnnamedLValue(t);
 		}
+	}
+	~Arrconst(){
+		for (auto p:arr)
+			delete p;
 	}
 	LValue* get_element(int i){
 		return arr[i];
@@ -369,7 +386,7 @@ public:
 		}
 	}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Arrconst(" << arr <<"["<<size<<"]"<<"of type "<< *type << ")";
+		out << "Arrconst([" << arr <<"] ["<<size<<"]"<<"of type "<< *type << ")";
 	}
 	virtual value get_value() const{
 		value v;
@@ -377,7 +394,7 @@ public:
 		return v;
 	}
 protected:
-	UnnamedLValue** arr;
+	std::vector<UnnamedLValue*> arr;
 	int size;
 };
 
@@ -1151,12 +1168,6 @@ public:
 protected:
 	LValue *lvalue;
 };
-template<class T>
-std::ostream& operator <<(std::ostream &out,const std::vector<T*> v) {
-	for(auto p :v)
-		out<<*p<<",";
-	return out;
-}
 
 template<class T>
 std::ostream& operator <<(std::ostream &out,const std::map<std::string,T*> m) {
