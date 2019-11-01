@@ -19,6 +19,10 @@ default: pcl
 # pcl_lexer: pcl_lexer.cpp
 # 	$(CC) -o pcl_lexer pcl_lexer.cpp
 
+debug: CFLAGS+= -g
+debug: pcl
+
+
 pcl_lexer.cpp:pcl_lexer.l
 	flex -s -o pcl_lexer.cpp pcl_lexer.l
 
