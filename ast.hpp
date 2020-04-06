@@ -975,7 +975,7 @@ public:
 			if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
 				ArrType* larrType=static_cast<ArrType*>(linType);
 				ArrType* rarrType=static_cast<ArrType*>(rinType);
-				if(rarrType->get_size()!=-1){
+				if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
 					if(larrType->get_type()->doCompare(rarrType->get_type()))
 						return;
 				}
