@@ -1405,8 +1405,21 @@ protected:
 };
 
 class Function:public Decl{
+	Function(std::string name,DeclList *decl_list, Type* return_type)
+		:Decl(name,"function"), ret_type(return_type),
+		 body(nullptr), formals(decl_list){}
 
+	void add_body(Body* bod){
+		body=bod;
+	}
+
+	virtual void run() const override{
+		declared[id]=ret_type;
+		formals->run();
+	}
 protected:
+	Type* ret_type;
+	Body* body;
 	DeclList* formals;
 };
 
