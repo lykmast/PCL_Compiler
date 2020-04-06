@@ -444,9 +444,9 @@ public:
 	}
 
 	virtual void sem() override{
-	// sets leftType, rightType and resType fields
-	// it should be run only once even when we have repeated evals
-	// e.g in while
+		// sets leftType, rightType and resType fields
+		// it should be run only once even when we have repeated evals
+		// e.g in while
 		Type* intType=INTEGER::getInstance();
 		Type* realType=REAL::getInstance();
 		Type* boolType=BOOLEAN::getInstance();
@@ -457,12 +457,12 @@ public:
 			right->sem();
 			rightType=right->get_type();
 			if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
-			//real or int operands-> real or int result
+				//real or int operands-> real or int result
 				if( (leftType->doCompare(realType) or leftType->doCompare(intType))
 				and (rightType->doCompare(realType) or rightType->doCompare(intType)) ){
-				//is a number (real or int)
+					//is a number (real or int)
 					if(leftType->doCompare(realType) or rightType->doCompare(realType))
-					// one of them is real
+						// one of them is real
 						resType=realType;
 					else
 						resType=intType;
@@ -470,17 +470,17 @@ public:
 			}
 
 			if(!(op.compare("/"))){
-			//real or int operands-> real result
+				//real or int operands-> real result
 				if( (leftType->doCompare(realType) or leftType->doCompare(intType))
 				and (rightType->doCompare(realType) or rightType->doCompare(intType)))
-				//is a number (real or int)
+					//is a number (real or int)
 					resType=realType;
 			}
 
 			if(!(op.compare("div")) or !(op.compare("mod")) ){
-			//int operands-> int result
+				//int operands-> int result
 				if(  leftType->doCompare(intType) and rightType->doCompare(intType))
-				//is int
+					//is int
 					resType=intType;
 			}
 
@@ -489,14 +489,14 @@ public:
 			//real or int operands-> bool result
 				if( (leftType->doCompare(realType) or leftType->doCompare(intType))
 				and (rightType->doCompare(realType) or rightType->doCompare(intType)))
-				//is a number (real or int)
+					//is a number (real or int)
 					resType=boolType;
 			}
 
 			if(!(op.compare("and")) or !(op.compare("or")) ){
-			//bool operands-> bool result
+				//bool operands-> bool result
 				if(  leftType->doCompare(boolType) and rightType->doCompare(boolType))
-				//is bool
+					//is bool
 					resType=boolType;
 			}
 			if(!(op.compare("[]"))){
