@@ -90,7 +90,7 @@ std::map<std::string, Type*> declared; // map variable names to values
 %%
 
 program:
-  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/$4->run();
+  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/$4->sem();std::cout<<"between sem and run"<<std::endl;$4->run();
 	std::cout<<"DECLARED: "<<declared<<std::endl<<"GLOBALS: "<<globals<<std::endl;}
 ;
 
