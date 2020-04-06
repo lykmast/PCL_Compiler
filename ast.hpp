@@ -404,7 +404,8 @@ public:
 		char* str=(char*)(malloc(sizeof(char)*(s.size()-1)));
 		s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
 		str[s.size()-2]='\0';
-		Const* arr = new Arrconst(s.size()-1,CHARACTER::getInstance());
+		Arrconst* arr = new Arrconst(s.size()-1,CHARACTER::getInstance());
+		arr->fromString(str);
 		let(arr);
 	}
 };
