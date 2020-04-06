@@ -484,9 +484,23 @@ public:
 					resType=intType;
 			}
 
-			if(!(op.compare("=")) or !(op.compare("<>")) or !(op.compare("<="))
-			or !(op.compare(">=")) or !(op.compare("<")) or !(op.compare(">")) ){
-			//real or int operands-> bool result
+			if(!(op.compare("=")) or !(op.compare("<>"))){
+				// either int/real operands or any non-array type operands
+				// -> bool result
+				if(( leftType->doCompare(realType) or leftType->doCompare(intType))
+				and (rightType->doCompare(realType) or rightType->doCompare(intType)))
+					// int/real operands
+					resType=boolType;
+
+				else if(leftType->doCompare(rightType)
+				and leftType->get_name().compare("array") )
+					// same type and not an array operands
+					resType=boolType;
+			}
+
+			if(!(op.compare("<=")) or !(op.compare(">=")) or !(op.compare("<"))
+					or !(op.compare(">")) ){
+				//real or int operands-> bool result
 				if( (leftType->doCompare(realType) or leftType->doCompare(intType))
 				and (rightType->doCompare(realType) or rightType->doCompare(intType)))
 					//is a number (real or int)
@@ -531,6 +545,7 @@ public:
 		// before the first eval of any op, there must have been one typecheck to
 		// fill resType, leftType, rightType
 		Type* realType=REAL::getInstance();
+		Type* intType=INTEGER::getInstance();
 		Const *leftConst=left->eval();
 		Const *rightConst=nullptr;
 		if(right){
@@ -702,25 +717,78 @@ public:
 		if(!(op.compare("<>"))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
+			LValue* lptr, *rptr;
+			bool isNumber=true;
 			value v;
 			if(leftType->doCompare(realType)){
 				v=leftConst->get_value();
 				lr=v.r;
 			}
-			else{
+			else if(leftType->doCompare(intType)){
 				v=leftConst->get_value();
 				li=v.i;
 			}
+			else{
+				v=leftConst->get_value();
+				lptr=v.lval;
+				isNumber=false;
+			}
+
 			if(rightType->doCompare(realType)){
 				v=rightConst->get_value();
 				rr=v.r;
 			}
-			else{
+			else if(rightType->doCompare(intType)) {
 				v=rightConst->get_value();
 				ri=v.i;
 			}
-			return new Bconst(li+lr!=ri+rr);
+			else{
+				v=rightConst->get_value();
+				rptr=v.lval;
+			}
+			if(isNumber)
+				return new Bconst(li+lr!=ri+rr);
+
+			return new Bconst(rptr!=lptr);
 		}
+		if(!(op.compare("="))) {
+			int li=0,ri=0;
+			double lr=0,rr=0;
+			LValue* lptr, *rptr;
+			bool isNumber=true;
+			value v;
+			if(leftType->doCompare(realType)){
+				v=leftConst->get_value();
+				lr=v.r;
+			}
+			else if(leftType->doCompare(intType)){
+				v=leftConst->get_value();
+				li=v.i;
+			}
+			else{
+				v=leftConst->get_value();
+				lptr=v.lval;
+				isNumber=false;
+			}
+
+			if(rightType->doCompare(realType)){
+				v=rightConst->get_value();
+				rr=v.r;
+			}
+			else if(rightType->doCompare(intType)) {
+				v=rightConst->get_value();
+				ri=v.i;
+			}
+			else{
+				v=rightConst->get_value();
+				rptr=v.lval;
+			}
+			if(isNumber)
+				return new Bconst(li+lr==ri+rr);
+
+			return new Bconst(rptr==lptr);
+		}
+
 		if(!(op.compare("<="))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
@@ -764,28 +832,6 @@ public:
 				ri=v.i;
 			}
 			return new Bconst(li+lr>=ri+rr);
-		}
-		if(!(op.compare("="))) {
-			int li=0,ri=0;
-			double lr=0,rr=0;
-			value v;
-			if(leftType->doCompare(realType)){
-				v=leftConst->get_value();
-				lr=v.r;
-			}
-			else{
-				v=leftConst->get_value();
-				li=v.i;
-			}
-			if(rightType->doCompare(realType)){
-				v=rightConst->get_value();
-				rr=v.r;
-			}
-			else{
-				v=rightConst->get_value();
-				ri=v.i;
-			}
-			return new Bconst(li+lr==ri+rr);
 		}
 		if(!(op.compare(">"))) {
 			int li=0,ri=0;
