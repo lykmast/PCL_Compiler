@@ -531,11 +531,9 @@ public:
 		// before the first eval of any op, there must have been one typecheck to
 		// fill resType, leftType, rightType
 		Type* realType=REAL::getInstance();
-		left->sem();
 		Const *leftConst=left->eval();
 		Const *rightConst=nullptr;
 		if(right){
-			right->sem();
 			rightConst=right->eval();
 		}
 		if(!(op.compare("+")) and right){
