@@ -47,10 +47,10 @@ W [ \t\r\n]
 "new" {return T_new;}
 "result" {return T_result;}
 {L}(_|{L}|{D})* {std::string *s=new std::string(yytext);yylval.var=s;return T_id;}
-{D}+\.{D}+(e(\-|\+)?{D}+)? {yylval.numd=atof(yytext);return T_rconst;}
+{D}+\.{D}+((e|E)(\-|\+)?{D}+)? {yylval.numd=atof(yytext);return T_rconst;}
 {D}+ {yylval.numi=atoi(yytext);return T_iconst;}
 \"([^\"\\]|{E})*\" {std::string* s=new std::string(yytext);yylval.var=s;return T_sconst;/*"*/}
-\'([^\'\\]|{E})\'	{yylval.ch=yytext[0];return T_cconst;/*'*/}
+\'([^\'\\\"]|{E})\'	{yylval.ch=yytext[0];return T_cconst;/*'*/}
 ":=" {return T_assign;}
 "<>" {return T_dt;}
 "<=" {return T_lt;}
