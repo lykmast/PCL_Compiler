@@ -154,6 +154,14 @@ public:
 	~ArrType(){if(type->should_delete()) delete type;}
 	virtual UnnamedLValue* create() const;
 	int get_size(){return size;}
+
+	virtual bool doCompare(Type* t) override{
+		if (!(name.compare(t->get_name()))){
+			ArrType* arrTy=static_cast<ArrType*>(t);
+			return size==arrTy->get_size() and type->doCompare(arrTy->get_type());
+		}
+		return false;
+	}
 	virtual void printOn(std::ostream &out) const override {
 		out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
 	}
