@@ -223,17 +223,22 @@ public:
 		out << "Id(" << name << ")";
 	}
 	virtual Const* eval() override {
-		std::map<std::string,Const*>::iterator it;
-		it=globals.find(name);
-		if(it==globals.end()){//TODO error or uninitialized value
+		if(!globals_lookup()){//TODO error or uninitialized value
 			std::cout<<"ERROR: Id '"<<name<<"' not initialized!"<<std::endl;
 			return nullptr;/*TODO throw error not found*/
 		}
-		return it->second;
+		return globals[name];
+	}
+
+	virtual void sem() override{
+		if(!declared_lookup()){
+			//TODO throw error variable not declared
+			std::cout<<"Id '"<<name<<"' not declared"<<std::endl;
+		}
 	}
 
 	virtual void let(Const* c){
-		bool hasValue=lookup();
+		bool hasValue=globals_lookup();
 		if(hasValue) delete globals[name];
 		globals[name]=c;
 	}
@@ -246,15 +251,18 @@ public:
 private:
 	std::string name;
 
-	bool lookup(){//returns true if the id already exists in globals
+	bool declared_lookup(){//returns true if the id is declared
+		std::map<std::string,Type*>::iterator it;
+		it=declared.find(name);
+		if(it==declared.end()){
+			return false;
+		}
+		return true;
+	}
+	bool globals_lookup(){//returns true if the id already exists in globals
 		std::map<std::string,Const*>::iterator it;
 		it=globals.find(name);
 		if(it==globals.end()){
-			std::map<std::string,Type*>::iterator it2;
-			if(it2==declared.end()){
-				//TODO throw error variable not declared
-				std::cout<<"Id '"<<name<<"' not declared"<<std::endl;
-			}
 			return false;
 		}
 		return true;
@@ -934,6 +942,9 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Reference" << "(" << *lvalue << ")";
 	}
+	virtual void sem() override{
+		lvalue->sem();
+	}
 	virtual Type* get_type(){
 		return new PtrType(lvalue->get_type());
 	}
@@ -988,6 +999,8 @@ public:
 		out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
 	}
 	virtual void sem() override{
+		lvalue->sem();
+		expr->sem();
 		Type* l_ty = lvalue->get_type();
 		if(l_ty->get_name().compare("array")){
 			//TODO error incorrect type
@@ -1029,6 +1042,7 @@ public:
 	}
 	virtual void sem() override{
 		expr->sem();
+		lvalue->sem();
 		Type* lType = lvalue->get_type();
 		Type* rType = expr->get_type();
 		if(lType->doCompare(rType)) return;
@@ -1147,6 +1161,7 @@ public:
 	}
 
 	virtual void sem() override{
+		lvalue->sem();
 		if(expr){
 			expr->sem();
 			if(!(expr->get_type()->doCompare(INTEGER::getInstance())) ){
@@ -1220,6 +1235,7 @@ public:
 	Dispose(LValue* lval):lvalue(lval){}
 	~Dispose(){delete lvalue;}
 	virtual void sem() override{
+		lvalue->sem();
 		if(lvalue->get_type()->get_name().compare("pointer")){
 			/*TODO ERROR incorrect type*/
 			std::cout<<
@@ -1252,6 +1268,7 @@ public:
 	DisposeArr(LValue* lval):lvalue(lval){}
 	~DisposeArr(){delete lvalue;}
 	virtual void sem() override{
+		lvalue->sem();
 		Type* t=lvalue->get_type();
 		if(t->get_name().compare("pointer")){
 			/*TODO ERROR incorrect type*/
@@ -1377,7 +1394,6 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Decl(" << decl_type <<":"<<id<<")";
 	}
-	virtual void run() const{};
 	std::string get_id(){return id;}
 protected:
 	std::string id;
@@ -1390,7 +1406,7 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "LabelDecl("<<id<<")";
 	}
-	virtual void run() const override{
+	virtual void sem() override{
 		declared[id]=LABEL::getInstance();
 	}
 };
@@ -1404,7 +1420,7 @@ public:
 		else
 		out << "VarDecl(" <<id<<" of type NOTSET)";
 	}
-	virtual void run() const override{
+	virtual void sem() override{
 		declared[id]=type;
 		if(!type->get_name().compare("array")){
 			// declared arrays of FIXED size should be initialized
@@ -1440,9 +1456,9 @@ public:
 			*p=d;
 		}
 	}
-	void run() const{
+	void sem() const{
 		for(auto p:list)
-			p->run();
+			p->sem();
 	}
 
 	void toLabel(){
@@ -1465,7 +1481,7 @@ public:
 	~Body(){delete declarations; delete statements;}
 
 	virtual void sem() const{
-		declarations->run();
+		declarations->sem();
 		statements->sem();
 	}
 
@@ -1490,9 +1506,9 @@ class Function:public Decl{
 		body=bod;
 	}
 
-	virtual void run() const override{
+	virtual void sem() override{
 		declared[id]=ret_type;
-		formals->run();
+		formals->sem();
 	}
 protected:
 	Type* ret_type;
