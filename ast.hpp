@@ -1019,7 +1019,9 @@ public:
 		element()->let(c);
 	}
 	virtual Type* get_type(){
-		return element()->get_type();
+		Type* l_ty = lvalue->get_type();
+		ArrType* larr_ty=static_cast<ArrType*>(l_ty);
+		return larr_ty->get_type();
 	}
 protected:
 	LValue* element(){
