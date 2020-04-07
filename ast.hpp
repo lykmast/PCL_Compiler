@@ -1399,9 +1399,13 @@ public:
 	virtual void run() const override{
 		declared[id]=type;
 		if(!type->get_name().compare("array")){
+			// declared arrays of FIXED size should be initialized
+			//   with empty cells (new Arrconst)
 			ArrType* arrT = static_cast<ArrType*>(type);
-			Const* arr = new Arrconst(arrT->get_size(),arrT->get_type());
-			globals[id]=arr;
+			if(arrT->get_size()>0){
+				Const* arr = new Arrconst(arrT->get_size(),arrT->get_type());
+				globals[id]=arr;
+			}
 		}
 	}
 	void set_type(Type* ty){type=ty;}
