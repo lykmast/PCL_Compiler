@@ -218,6 +218,7 @@ public:
 		std::map<std::string,Const*>::iterator it;
 		it=globals.find(name);
 		if(it==globals.end()){//TODO error or uninitialized value
+			std::cout<<"ERROR: Id '"<<name<<"' not initialized!"<<std::endl;
 			return nullptr;/*TODO throw error not found*/
 		}
 		return it->second;
@@ -243,7 +244,8 @@ private:
 		if(it==globals.end()){
 			std::map<std::string,Type*>::iterator it2;
 			if(it2==declared.end()){
-				 //TODO throw error variable not declared
+				//TODO throw error variable not declared
+				std::cout<<"Id '"<<name<<"' not declared"<<std::endl;
 			}
 			return false;
 		}
@@ -367,7 +369,10 @@ inline UnnamedLValue* PtrType::create() const{
 class Arrconst: public Const{
 public:
 	Arrconst(int s, Type* t):Const(  t ),size(s){
-		if(s<0){/*TODO error wrong value*/}
+		if(s<0){
+			/*TODO error wrong value*/
+			std::cout<<"ERROR: "<< s <<" is bad size for array!"<<std::endl;
+		}
 		arr.resize(s);
 		for(int i=0;i<s;i++){
 			arr[i]=new UnnamedLValue(t);
@@ -521,7 +526,10 @@ public:
 					}
 				}
 			}
-			if(!resType){/*TODO ERROR type mismatch*/}
+			if(!resType){
+				/*TODO ERROR type mismatch*/
+				std::cout<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+			}
 			return;
 		}
 		//UNOP
@@ -535,10 +543,11 @@ public:
 			if(leftType->doCompare(boolType) )
 				resType=boolType;
 		}
-		if(!resType){/*TODO ERROR type mismatch*/}
+		if(!resType){
+			/*TODO ERROR type mismatch*/
+			std::cout<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+		}
 		return;
-
-		//TODO @ and ^ operators typecheck
 	}
 
 	virtual Const* eval() override {
@@ -938,6 +947,8 @@ public:
 		Type* ty=expr->get_type();
 		if(ty->get_name().compare("pointer")){
 			//TODO error incorrect type
+			std::cout << "ERROR: Can only dereference pointer (not "<<
+			ty->get_name()<<")" <<std::endl;
 		}
 	}
 	virtual Const* eval(){
@@ -972,9 +983,12 @@ public:
 		Type* l_ty = lvalue->get_type();
 		if(l_ty->get_name().compare("array")){
 			//TODO error incorrect type
+			std::cout << "ERROR: Can only apply brakets to array (not "<<
+			l_ty->get_name()<<")" <<std::endl;
 		}
 		if(!expr->get_type()->doCompare(INTEGER::getInstance())){
 			//TODO error incorrect type for array index should be int
+			std::cout << "ERROR: Array index should be int!"<<std::endl;
 		}
 	}
 	virtual Const* eval(){
@@ -1028,6 +1042,7 @@ public:
 			}
 		}
 		/*TODO error type mismatch*/
+		std::cout<<"ERROR: Type mismatch in let!"<<std::endl;
 	}
 
 	virtual void run() const override{
@@ -1058,8 +1073,12 @@ public:
 	}
 	virtual void sem() override{
 		expr->sem();
-		if(!(expr->get_type()==BOOLEAN::getInstance()))
-			{/*TODO ERROR incorrect type*/}
+		if(!(expr->get_type()==BOOLEAN::getInstance())){
+			/*TODO ERROR incorrect type*/
+			std::cout<<
+				"ERROR: Incorrect type of expression in if statement!"
+				<<std::endl;
+		}
 		stmt1->sem();
 		if(stmt2)
 			stmt2->sem();
@@ -1084,8 +1103,12 @@ public:
 	}
 	virtual void sem() override{
 		expr->sem();
-		if(!(expr->get_type()==BOOLEAN::getInstance()))
-			{/*TODO ERROR incorrect type*/}
+		if(!(expr->get_type()==BOOLEAN::getInstance())){
+			/*TODO ERROR incorrect type*/
+			std::cout<<
+				"ERROR: Incorrect type of expression in while statement!"
+				<<std::endl;
+		}
 		stmt->sem();
 	}
 	virtual void run() const override{
@@ -1120,19 +1143,34 @@ public:
 			expr->sem();
 			if(!(expr->get_type()->doCompare(INTEGER::getInstance())) ){
 				/*TODO ERROR incorrect type*/
+				std::cout<<
+					"ERROR: Incorrect type of expression in New statement!"
+					<<std::endl;
 			}
 			Type* idType=lvalue->get_type();
-			if(idType->get_name().compare("pointer") )
-			{/*TODO ERROR incorrect type*/}
+			if(idType->get_name().compare("pointer") ){
+				/*TODO ERROR incorrect type*/
+				std::cout<<
+					"ERROR: Incorrect type of expression in New statement!"
+					<<std::endl;
+			}
 			PtrType* p=static_cast<PtrType*>(idType);
 			Type* t=p->get_type();
-			if(t->get_name().compare("array") )
-			{/*TODO ERROR incorrect type*/}
+			if(t->get_name().compare("array") ){
+				/*TODO ERROR incorrect type*/
+				std::cout<<
+					"ERROR: Incorrect type of expression in New statement!"
+					<<std::endl;
+			}
 		}
 		else{
 			Type* idType=lvalue->get_type();
-			if(idType->get_name().compare("pointer") )
-			{/*TODO ERROR incorrect type*/}
+			if(idType->get_name().compare("pointer") ){
+				/*TODO ERROR incorrect type*/
+				std::cout<<
+					"ERROR: Incorrect type of expression in New statement!"
+					<<std::endl;
+			}
 		}
 	}
 	virtual void run() const override{
@@ -1140,7 +1178,12 @@ public:
 			Const* c= expr->eval();
 			value v = c->get_value();
 			int i = v.i;
-			if(i<=0) {/*TODO ERROR wrong value*/}
+			if(i<=0) {
+				/*TODO ERROR wrong value*/
+				std::cout<<
+					"ERROR: Wrong value for array size in New statement!"
+					<<std::endl;
+			}
 			Type* idType=lvalue->get_type();
 			PtrType* p=static_cast<PtrType*>(idType);
 			Type* t=p->get_type();
@@ -1169,14 +1212,23 @@ public:
 	Dispose(LValue* lval):lvalue(lval){}
 	~Dispose(){delete lvalue;}
 	virtual void sem() override{
-		if(lvalue->get_type()->get_name().compare("pointer"))
-		{/*TODO ERROR incorrect type*/}
+		if(lvalue->get_type()->get_name().compare("pointer")){
+			/*TODO ERROR incorrect type*/
+			std::cout<<
+				"ERROR: Incorrect type of expression in Dispose statement!"
+				<<std::endl;
+		}
 	}
 	virtual void run() const{
 		Const *c = lvalue->eval();
 		value v = c->get_value();
 		LValue* ptr = v.lval;
-		if(!(ptr->isDynamic())){/*TODO ERROR non dynamic pointer (RUNTIME)*/}
+		if(!(ptr->isDynamic())){
+			/*TODO ERROR non dynamic pointer (RUNTIME)*/
+			std::cout<<
+				"ERROR: non dynamic pointer in Dispose (RUNTIME)"
+				<<std::endl;
+		}
 		delete ptr;
 		lvalue->let(new Pconst());
 	}
@@ -1193,17 +1245,30 @@ public:
 	~DisposeArr(){delete lvalue;}
 	virtual void sem() override{
 		Type* t=lvalue->get_type();
-		if(t->get_name().compare("pointer"))
-		{/*TODO ERROR incorrect type*/}
+		if(t->get_name().compare("pointer")){
+			/*TODO ERROR incorrect type*/
+			std::cout<<
+				"ERROR: Incorrect type of expression in DisposeArr statement!"
+				<<std::endl;
+		}
 		PtrType *pt = static_cast<PtrType*>(t);
-		if(pt->get_name().compare("array"))
-		{/*TODO ERROR incorrect type*/}
+		if(pt->get_name().compare("array")){
+			/*TODO ERROR incorrect type*/
+			std::cout<<
+				"ERROR: Incorrect type of expression in DisposeArr statement!"
+				<<std::endl;
+		}
 	}
 	virtual void run() const{
 		Const *c = lvalue->eval();
 		value v = c->get_value();
 		LValue* ptr = v.lval;
-		if(!(ptr->isDynamic())){/*TODO ERROR non dynamic pointer (RUNTIME)*/}
+		if(!(ptr->isDynamic())){
+			/*TODO ERROR non dynamic pointer (RUNTIME)*/
+			std::cout<<
+				"ERROR: non dynamic pointer in DisposeArr (RUNTIME)"
+				<<std::endl;
+		}
 		delete ptr;
 		lvalue->let(new Pconst());
 	}
