@@ -3,9 +3,12 @@
 #include "pcl_lexer.hpp"
 #include "ast.hpp"
 #include <string>
+#include <vector>
+
+SymbolTable st;
 std::map<std::string, Const*> globals; // map variable names to values
 std::map<std::string, Type*> declared; // map variable names to values
-
+std::vector<Const*> rt_stack;
 %}
 
 %define parse.error verbose

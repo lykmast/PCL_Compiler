@@ -175,6 +175,7 @@ protected:
 
 extern std::map<std::string, Const*> globals; // map variable names to values
 extern std::map<std::string, Type*> declared; // map variable names to values
+extern std::vector<Const*> rt_stack;
 
 
 class Expr: public AST {
