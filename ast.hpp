@@ -4,6 +4,7 @@
 #include <map>
 #include <vector>
 #include <string>
+#include "symbol.hpp"
 
 class LValue;
 union value{
@@ -361,6 +362,10 @@ public:
 	Pconst(LValue* pval,Type *t):Const(new PtrType(t) ),ptr(pval){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Pconst(" << ptr << "of type "<<*type<< ")";
+		if(ptr)
+			out<<"->"<<*ptr;
+		else
+			out<<"->nil";
 	}
 	virtual value get_value() const override {
 		value v; v.lval=ptr;
@@ -388,7 +393,8 @@ public:
 	Arrconst(int s, Type* t):Const(  t ),size(s){
 		if(s<0){
 			/*TODO error wrong value*/
-			std::cout<<"ERROR: "<< s <<" is bad size for array!"<<std::endl;
+			std::cerr<<"ERROR: "<< s <<" is bad size for array!"<<std::endl;
+			exit(1);
 		}
 		arr.resize(s);
 		for(int i=0;i<s;i++){
@@ -545,7 +551,8 @@ public:
 			}
 			if(!resType){
 				/*TODO ERROR type mismatch*/
-				std::cout<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+				std::cerr<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+				exit(1);
 			}
 			return;
 		}
@@ -562,7 +569,8 @@ public:
 		}
 		if(!resType){
 			/*TODO ERROR type mismatch*/
-			std::cout<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+			std::cerr<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+			exit(1);
 		}
 		return;
 	}
@@ -967,7 +975,7 @@ public:
 		Type* ty=expr->get_type();
 		if(ty->get_name().compare("pointer")){
 			//TODO error incorrect type
-			std::cout << "ERROR: Can only dereference pointer (not "<<
+			std::cerr << "ERROR: Can only dereference pointer (not "<<
 			ty->get_name()<<")" <<std::endl;
 		}
 	}
@@ -1005,14 +1013,17 @@ public:
 		Type* l_ty = lvalue->get_type();
 		if(l_ty->get_name().compare("array")){
 			//TODO error incorrect type
-			std::cout << "ERROR: Can only apply brakets to array (not "<<
+			std::cerr << "ERROR: Can only apply brakets to array (not "<<
 			l_ty->get_name()<<")" <<std::endl;
+			exit(1);
 		}
 		if(!expr->get_type()->doCompare(INTEGER::getInstance())){
 			//TODO error incorrect type for array index should be int
-			std::cout << "ERROR: Array index should be int!"<<std::endl;
+			std::cerr << "ERROR: Array index should be int!"<<std::endl;
+			exit(1);
 		}
 	}
+
 	virtual Const* eval(){
 		return element()->eval();
 	}
@@ -1048,6 +1059,7 @@ public:
 		lvalue->sem();
 		Type* lType = lvalue->get_type();
 		Type* rType = expr->get_type();
+		std::cerr<<"<lType,rType>: <"<<*lType<<","<<*rType<<">"<<std::endl;
 		if(lType->doCompare(rType)) return;
 		else different_types=true;
 		if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
@@ -1067,7 +1079,8 @@ public:
 			}
 		}
 		/*TODO error type mismatch*/
-		std::cout<<"ERROR: Type mismatch in let!"<<std::endl;
+		std::cerr<<"ERROR: Type mismatch in let!"<<std::endl;
+		exit(1);
 	}
 
 	virtual void run() const override{
@@ -1100,9 +1113,10 @@ public:
 		expr->sem();
 		if(!(expr->get_type()==BOOLEAN::getInstance())){
 			/*TODO ERROR incorrect type*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: Incorrect type of expression in if statement!"
 				<<std::endl;
+				exit(1);
 		}
 		stmt1->sem();
 		if(stmt2)
@@ -1130,9 +1144,10 @@ public:
 		expr->sem();
 		if(!(expr->get_type()==BOOLEAN::getInstance())){
 			/*TODO ERROR incorrect type*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: Incorrect type of expression in while statement!"
 				<<std::endl;
+			exit(1);
 		}
 		stmt->sem();
 	}
@@ -1169,33 +1184,37 @@ public:
 			expr->sem();
 			if(!(expr->get_type()->doCompare(INTEGER::getInstance())) ){
 				/*TODO ERROR incorrect type*/
-				std::cout<<
+				std::cerr<<
 					"ERROR: Incorrect type of expression in New statement!"
 					<<std::endl;
+				exit(1);
 			}
 			Type* idType=lvalue->get_type();
 			if(idType->get_name().compare("pointer") ){
 				/*TODO ERROR incorrect type*/
-				std::cout<<
+				std::cerr<<
 					"ERROR: Incorrect type of expression in New statement!"
 					<<std::endl;
+				exit(1);
 			}
 			PtrType* p=static_cast<PtrType*>(idType);
 			Type* t=p->get_type();
 			if(t->get_name().compare("array") ){
 				/*TODO ERROR incorrect type*/
-				std::cout<<
+				std::cerr<<
 					"ERROR: Incorrect type of expression in New statement!"
 					<<std::endl;
+				exit(1);
 			}
 		}
 		else{
 			Type* idType=lvalue->get_type();
 			if(idType->get_name().compare("pointer") ){
 				/*TODO ERROR incorrect type*/
-				std::cout<<
+				std::cerr<<
 					"ERROR: Incorrect type of expression in New statement!"
 					<<std::endl;
+				exit(1);
 			}
 		}
 	}
@@ -1206,9 +1225,10 @@ public:
 			int i = v.i;
 			if(i<=0) {
 				/*TODO ERROR wrong value*/
-				std::cout<<
+				std::cerr<<
 					"ERROR: Wrong value for array size in New statement!"
 					<<std::endl;
+				exit(1);
 			}
 			Type* idType=lvalue->get_type();
 			PtrType* p=static_cast<PtrType*>(idType);
@@ -1241,9 +1261,10 @@ public:
 		lvalue->sem();
 		if(lvalue->get_type()->get_name().compare("pointer")){
 			/*TODO ERROR incorrect type*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: Incorrect type of expression in Dispose statement!"
 				<<std::endl;
+			exit(1);
 		}
 	}
 	virtual void run() const{
@@ -1252,9 +1273,10 @@ public:
 		LValue* ptr = v.lval;
 		if(!(ptr->isDynamic())){
 			/*TODO ERROR non dynamic pointer (RUNTIME)*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: non dynamic pointer in Dispose (RUNTIME)"
 				<<std::endl;
+			exit(1);
 		}
 		delete ptr;
 		lvalue->let(new Pconst());
@@ -1275,16 +1297,18 @@ public:
 		Type* t=lvalue->get_type();
 		if(t->get_name().compare("pointer")){
 			/*TODO ERROR incorrect type*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: Incorrect type of expression in DisposeArr statement!"
 				<<std::endl;
+			exit(1);
 		}
 		PtrType *pt = static_cast<PtrType*>(t);
 		if(pt->get_name().compare("array")){
 			/*TODO ERROR incorrect type*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: Incorrect type of expression in DisposeArr statement!"
 				<<std::endl;
+			exit(1);
 		}
 	}
 	virtual void run() const{
@@ -1293,9 +1317,10 @@ public:
 		LValue* ptr = v.lval;
 		if(!(ptr->isDynamic())){
 			/*TODO ERROR non dynamic pointer (RUNTIME)*/
-			std::cout<<
+			std::cerr<<
 				"ERROR: non dynamic pointer in DisposeArr (RUNTIME)"
 				<<std::endl;
+			exit(1);
 		}
 		delete ptr;
 		lvalue->let(new Pconst());
@@ -1410,7 +1435,7 @@ public:
 		out << "LabelDecl("<<id<<")";
 	}
 	virtual void sem() override{
-		declared[id]=LABEL::getInstance();
+		st.insert(id,LABEL::getInstance());
 	}
 };
 class VarDecl: public Decl{
@@ -1424,20 +1449,27 @@ public:
 		out << "VarDecl(" <<id<<" of type NOTSET)";
 	}
 	virtual void sem() override{
-		declared[id]=type;
-		if(!type->get_name().compare("array")){
-			// declared arrays of FIXED size should be initialized
-			//   with empty cells (new Arrconst)
-			ArrType* arrT = static_cast<ArrType*>(type);
-			if(arrT->get_size()>0){
-				Const* arr = new Arrconst(arrT->get_size(),arrT->get_type());
-				globals[id]=arr;
-			}
-		}
+		int s=get_sizeof(type);
+		st.insert(id,type,s);
 	}
 	void set_type(Type* ty){type=ty;}
 protected:
 	Type* type;
+	int get_sizeof(Type* t){
+		if(!t->get_name().compare("array")){
+			// t is ArrType
+			ArrType* arr_type=static_cast<ArrType*>(t);
+			int s=arr_type->get_size();
+			if(s>0){
+				// declared arrays of FIXED size should
+				//   take more space in stack
+				Type* inside=arr_type->get_type();
+				return s*get_sizeof(inside);
+			}
+		}
+		// non-static-array types have size 1 in stack
+		return 1;
+	}
 };
 
 class FormalDecl: public VarDecl{
@@ -1478,18 +1510,36 @@ public:
 	}
 };
 
+inline void print_stack(){
+	std::cout<<"STACK:"<<std::endl;
+	for(auto p : rt_stack ){
+		if(p)
+			std::cout<<*p;
+		else
+			std::cout<<"EMPTY";
+	std::cout<<std::endl;
+	}
+}
+
+
 class Body: public AST{
 public:
-	Body(DeclList* d, StmtList* s):declarations(d),statements(s){}
+	Body(DeclList* d, StmtList* s):declarations(d),statements(s),size(0){}
 	~Body(){delete declarations; delete statements;}
 
-	virtual void sem() const{
+	virtual void sem() override{
+		st.openScope();
 		declarations->sem();
 		statements->sem();
+		size = st.getSizeOfCurrentScope();
+		st.closeScope();
 	}
 
 	void run() const{
+		for (int i = 0; i < size; ++i) rt_stack.push_back(nullptr);
 		statements->run();
+		print_stack();
+		for (int i = 0; i < size; ++i) rt_stack.pop_back();
 	}
 
 	virtual void printOn(std::ostream &out) const override {
@@ -1498,6 +1548,7 @@ public:
 protected:
 	DeclList* declarations;
 	StmtList* statements;
+	int size;
 };
 
 class Function:public Decl{

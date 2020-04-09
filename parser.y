@@ -130,7 +130,7 @@ type:
 | "char" {$$ = CHARACTER::getInstance(); }
 | "array" '[' T_iconst ']' "of" full_type {$$ = new ArrType($3,$6);}
 | "array" "of" full_type {$$ = new ArrType($3);}
-| '^' full_type {$$ = new PtrType($2);}
+| '^' type {$$ = new PtrType($2);}
 ;
 
 full_type:

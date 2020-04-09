@@ -26,12 +26,12 @@ debug: pcl
 pcl_lexer.cpp:pcl_lexer.l
 	flex -s -o pcl_lexer.cpp pcl_lexer.l
 
-pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp
+pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp symbol.hpp
 
 parser.hpp parser.cpp: parser.y
 	bison -dv -o parser.cpp parser.y
 
-parser.o: parser.cpp pcl_lexer.hpp ast.hpp
+parser.o: parser.cpp pcl_lexer.hpp ast.hpp symbol.hpp
 
 pcl: pcl_lexer.o parser.o
 	$(CC) $(CFLAGS) -o pcl pcl_lexer.o parser.o

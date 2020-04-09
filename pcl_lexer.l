@@ -11,7 +11,7 @@
 
 L [a-zA-Z]
 D [0-9]
-E \\(n|t|r|\'|\"|0)?
+E \\(n|t|r|\'|\"|0|\\)?
 W [ \t\r\n]
 %%
 "var" {return T_var;/*'*/}
@@ -49,7 +49,7 @@ W [ \t\r\n]
 {L}(_|{L}|{D})* {std::string *s=new std::string(yytext);yylval.var=s;return T_id;}
 {D}+\.{D}+((e|E)(\-|\+)?{D}+)? {yylval.numd=atof(yytext);return T_rconst;}
 {D}+ {yylval.numi=atoi(yytext);return T_iconst;}
-\"([^\"\\]|{E})*\" {std::string* s=new std::string(yytext);yylval.var=s;return T_sconst;/*"*/}
+\"([^\'\\\"]|{E})*\" {std::string* s=new std::string(yytext);yylval.var=s;return T_sconst;/*"*/}
 \'([^\'\\\"]|{E})\'	{yylval.ch=yytext[0];return T_cconst;/*'*/}
 ":=" {return T_assign;}
 "<>" {return T_dt;}

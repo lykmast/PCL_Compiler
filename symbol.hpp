@@ -1,10 +1,14 @@
 #pragma once
 
+#include <iostream>
 #include <cstdlib>
+#include <map>
 #include <vector>
-#include "ast.hpp"
 #include <string>
-#include "symbol.hpp"
+
+
+// forward declaration of ast class Type
+class Type;
 
 struct SymbolEntry {
 	Type* type;
@@ -23,13 +27,14 @@ public:
 		if (locals.find(name) == locals.end()) return nullptr;
 		return &(locals[name]);
 	}
-	void insert(std::string name, Type* t) {
+	void insert(std::string name, Type* t, int s) {
 		if (locals.find(name) != locals.end()) {
 			std::cerr << "Duplicate variable " << name << std::endl;
 			exit(1);
 		}
-		locals[name] = SymbolEntry(t, offset++);
-		++size;
+		locals[name] = SymbolEntry(t, offset);
+		offset+=s;
+		size+=s;
 	}
 private:
 	std::map<std::string, SymbolEntry> locals;
@@ -53,7 +58,7 @@ public:
 		exit(1);
 	}
 	int getSizeOfCurrentScope() const { return scopes.back().getSize(); }
-	void insert(std::string name, Type* t) { scopes.back().insert(name, t); }
+	void insert(std::string name, Type* t, int size=1) { scopes.back().insert(name, t, size); }
 private:
 	std::vector<Scope> scopes;
 };
