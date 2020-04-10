@@ -48,6 +48,7 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Type(" << name << ")";
 	}
+	virtual Type* clone(){return this;}
 	virtual bool should_delete() const{//should not delete Singleton
 		return false;
 	}
@@ -130,7 +131,10 @@ public:
 	PtrType(std::string name,Type* t):Type(name),type(t){}//TODO erase
 	~PtrType(){if(type->should_delete()) delete type;}
 	virtual UnnamedLValue* create() const;
-	Type* get_type(){ return type;}
+	virtual Type* clone(){
+		return new PtrType(type->clone());
+	}
+	Type* get_type(){ return type->clone();}
 	virtual void printOn(std::ostream &out) const override {
 		out << "PtrType(" << name <<"of type "<< *type << ")";
 	}
@@ -153,9 +157,11 @@ public:
 	ArrType(int s,Type* t):PtrType("array",t),size(s){}
 	ArrType(Type* t):PtrType("array",t),size(-1){}
 	~ArrType(){if(type->should_delete()) delete type;}
+	virtual Type* clone(){
+		return new ArrType(size,type->clone());
+	}
 	virtual UnnamedLValue* create() const;
 	int get_size(){return size;}
-
 	virtual bool doCompare(Type* t) override{
 		if (!(name.compare(t->get_name()))){
 			ArrType* arrTy=static_cast<ArrType*>(t);
@@ -197,10 +203,11 @@ class Const: public Expr{
 public:
 	Const(Type* ty):type(ty){}
 	~Const(){if(type->should_delete()) delete type;}
-	virtual Type* get_type() override{return type;}
+	virtual Type* get_type() override{return type->clone();}
 	virtual void printOn(std::ostream &out) const =0;
-	virtual Const* eval() override{return this;}
-	virtual value get_value() const=0;
+	virtual Const* clone()=0;
+	virtual Const* eval() override{return this->clone();}
+	virtual value get_value() const{value v; v.lval=nullptr; return v;}
 	virtual Const* copyToType() const {return nullptr;}
 protected:
 	Type* type;
@@ -279,18 +286,27 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		if(value)
 			out << "UnnamedLValue(" << *value<<","<<*type << ")";
-		else
+		else if(type)
 			out << "UnnamedLValue(EMPTY, "<<*type << ")";
+		else
+			out << "UnnamedLValue(EMPTY)";
 	}
 	virtual void let(Const* c) override{
-		if(value) delete value;
+		if(value)delete value;
 		value=c;
+		if(type)
+			if(type->should_delete())
+				delete type;
+		type=c->get_type();
 	}
 	virtual Const* eval() override{
-		return value;
+		if(value)
+			return value->eval();
+		else
+			return nullptr;
 	}
 	virtual Type* get_type(){
-		return type;
+		return type->clone();
 	}
 protected:
 	Const* value;
@@ -299,9 +315,12 @@ protected:
 
 
 
+
+
 class Rconst: public Const {
 public:
 	Rconst(double n):Const(REAL::getInstance() ),num(n){}
+	virtual Const* clone() override{return new Rconst(*this);}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Rconst(" << num << ")";
 	}
@@ -320,6 +339,7 @@ inline UnnamedLValue* REAL::create() const{
 class Iconst: public Const {
 public:
 	Iconst(int n):Const(INTEGER::getInstance()),num(n){}
+	virtual Const* clone() override{return new Iconst(*this);}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Iconst(" << num << ")";
 	}
@@ -341,6 +361,7 @@ inline UnnamedLValue* INTEGER::create() const{
 class Cconst: public Const {
 public:
 	Cconst(char c):Const(CHARACTER::getInstance() ),ch(c){}
+	virtual Const* clone() override{return new Cconst(*this);}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Cconst(" << ch << ")";
 	}
@@ -359,6 +380,7 @@ inline UnnamedLValue* CHARACTER::create() const{
 class Pconst: public Const {
 public:
 	Pconst():Const(new PtrType(ANY::getInstance())),ptr(nullptr){}//TODO implement for pointers different than nil
+	virtual Const* clone() override{return new Pconst(*this);}
 	Pconst(LValue* pval,Type *t):Const(new PtrType(t) ),ptr(pval){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Pconst(" << ptr << "of type "<<*type<< ")";
@@ -445,6 +467,7 @@ inline UnnamedLValue* ArrType::create() const{
 class Bconst: public Const {
 public:
 	Bconst(bool b):Const(BOOLEAN::getInstance() ),boo(b){}
+	virtual Const* clone() override{return new Bconst(*this);}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Bconst(" << boo <<")";
 	}
@@ -582,6 +605,7 @@ public:
 		Type* intType=INTEGER::getInstance();
 		Const *leftConst=left->eval();
 		Const *rightConst=nullptr;
+		Const* ret=nullptr;
 		if(right){
 			rightConst=right->eval();
 		}
@@ -607,13 +631,13 @@ public:
 				ri=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst(li+ri+lr+rr);
+				ret = new Rconst(li+ri+lr+rr);
 			}
 			else{
-				return new Iconst(li+ri);
+				ret = new Iconst(li+ri);
 			}
 		}
-		if(!(op.compare("+"))){
+		else if(!(op.compare("+"))){
 			//UnOp
 			int li=0;
 			double lr=0;
@@ -627,13 +651,13 @@ public:
 				li=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst(li+lr);
+				ret = new Rconst(li+lr);
 			}
 			else{
-				return new Iconst(li);
+				ret = new Iconst(li);
 			}
 		}
-		if(!(op.compare("-")) and right) {
+		else if(!(op.compare("-")) and right) {
 		//BinOp
 			int li=0,ri=0;
 			double lr=0,rr=0;
@@ -655,13 +679,13 @@ public:
 				ri=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst(li-ri+lr-rr);
+				ret = new Rconst(li-ri+lr-rr);
 			}
 			else{
-				return new Iconst(li-ri);
+				ret = new Iconst(li-ri);
 			}
 		}
-		if(!(op.compare("-"))){
+		else if(!(op.compare("-"))){
 			//UnOp
 			int li=0;
 			double lr=0;
@@ -675,13 +699,13 @@ public:
 				li=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst(-li-lr);
+				ret = new Rconst(-li-lr);
 			}
 			else{
-				return new Iconst(-li);
+				ret = new Iconst(-li);
 			}
 		}
-		if(!(op.compare("*"))) {
+		else if(!(op.compare("*"))) {
 		//BinOp
 			int li=1,ri=1;
 			double lr=1,rr=1;
@@ -703,13 +727,13 @@ public:
 				ri=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst(li*ri*lr*rr);
+				ret = new Rconst(li*ri*lr*rr);
 			}
 			else{
-				return new Iconst(li*ri);
+				ret = new Iconst(li*ri);
 			}
 		}
-		if(!(op.compare("/"))){
+		else if(!(op.compare("/"))){
 			int li=1,ri=1;
 			double lr=1,rr=1;
 			value v;
@@ -730,7 +754,7 @@ public:
 				ri=v.i;
 			}
 			if(resType->doCompare(realType)){
-				return new Rconst((li/rr)*(lr/ri));
+				ret = new Rconst((li/rr)*(lr/ri));
 			}
 		}
 
@@ -739,16 +763,16 @@ public:
 			int li=v.i;
 			v=rightConst->get_value();
 			int ri=v.i;
-			return new Iconst(li/ri);
+			ret = new Iconst(li/ri);
 		}
-		if(!(op.compare("mod"))) {
+		else if(!(op.compare("mod"))) {
 			value v=leftConst->get_value();
 			int li=v.i;
 			v=rightConst->get_value();
 			int ri=v.i;
-			return new Iconst(li%ri);
+			ret = new Iconst(li%ri);
 		}
-		if(!(op.compare("<>"))) {
+		else if(!(op.compare("<>"))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
 			LValue* lptr, *rptr;
@@ -781,11 +805,11 @@ public:
 				rptr=v.lval;
 			}
 			if(isNumber)
-				return new Bconst(li+lr!=ri+rr);
+				ret = new Bconst(li+lr!=ri+rr);
 
-			return new Bconst(rptr!=lptr);
+			ret = new Bconst(rptr!=lptr);
 		}
-		if(!(op.compare("="))) {
+		else if(!(op.compare("="))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
 			LValue* lptr, *rptr;
@@ -818,12 +842,12 @@ public:
 				rptr=v.lval;
 			}
 			if(isNumber)
-				return new Bconst(li+lr==ri+rr);
+				ret = new Bconst(li+lr==ri+rr);
 
-			return new Bconst(rptr==lptr);
+			ret = new Bconst(rptr==lptr);
 		}
 
-		if(!(op.compare("<="))) {
+		else if(!(op.compare("<="))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
 			value v;
@@ -843,9 +867,9 @@ public:
 				v=rightConst->get_value();
 				ri=v.i;
 			}
-			return new Bconst(li+lr<=ri+rr);
+			ret = new Bconst(li+lr<=ri+rr);
 		}
-		if(!(op.compare(">="))) {
+		else if(!(op.compare(">="))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
 			value v;
@@ -865,9 +889,9 @@ public:
 				v=rightConst->get_value();
 				ri=v.i;
 			}
-			return new Bconst(li+lr>=ri+rr);
+			ret = new Bconst(li+lr>=ri+rr);
 		}
-		if(!(op.compare(">"))) {
+		else if(!(op.compare(">"))) {
 			int li=0,ri=0;
 			double lr=0,rr=0;
 			value v;
@@ -887,53 +911,55 @@ public:
 				v=rightConst->get_value();
 				ri=v.i;
 			}
-			return new Bconst(li+lr > ri+rr);
-		};
-		if(!(op.compare("<"))) {
-			int li=0,ri=0;
-			double lr=0,rr=0;
-			value v;
-			if(leftType->doCompare(realType)){
-				v=leftConst->get_value();
-				lr=v.r;
-			}
-			else{
-				v=leftConst->get_value();
-				li=v.i;
-			}
-			if(rightType->doCompare(realType)){
-				v=rightConst->get_value();
-				rr=v.r;
-			}
-			else{
-				v=rightConst->get_value();
-				ri=v.i;
-			}
-			return new Bconst(li+lr < ri+rr);
+			ret = new Bconst(li+lr > ri+rr);
 		}
-		if(!(op.compare("and"))) {
+		else if(!(op.compare("<"))) {
+			int li=0,ri=0;
+			double lr=0,rr=0;
+			value v;
+			if(leftType->doCompare(realType)){
+				v=leftConst->get_value();
+				lr=v.r;
+			}
+			else{
+				v=leftConst->get_value();
+				li=v.i;
+			}
+			if(rightType->doCompare(realType)){
+				v=rightConst->get_value();
+				rr=v.r;
+			}
+			else{
+				v=rightConst->get_value();
+				ri=v.i;
+			}
+			ret = new Bconst(li+lr < ri+rr);
+		}
+		else if(!(op.compare("and"))) {
 			value v=leftConst->get_value();
 			bool lb=v.b;
 			v=rightConst->get_value();
 			bool rb=v.b;
-			return new Bconst(lb and rb);
+			ret = new Bconst(lb and rb);
 		}
-		if(!(op.compare("or"))) {
+		else if(!(op.compare("or"))) {
 			value v=leftConst->get_value();
 			bool lb=v.b;
 			v=rightConst->get_value();
 			bool rb=v.b;
-			return new Bconst(lb or rb);
+			ret = new Bconst(lb or rb);
 		}
-		if(!(op.compare("not"))) {
+		else if(!(op.compare("not"))) {
 			//UnOp
 
 			value v;
 			v=leftConst->get_value();
 			bool lb=v.b;
-			return new Bconst(not lb);
+			ret = new Bconst(not lb);
 		}
-		return 0;  // this will never be reached.
+		delete leftConst;
+		if(right) delete rightConst;
+		return ret;
 	}
 	virtual Type* get_type() override{
 		return resType;
