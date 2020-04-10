@@ -176,13 +176,9 @@ protected:
 	int size;
 };
 
-// const Type * INTEGER=new Type("integer"),* REAL=new Type("real"),
-// *BOOLEAN=new Type("boolean"), CHARACTER=new Type("char");
 
 
-extern std::map<std::string, Const*> globals; // map variable names to values
-extern std::map<std::string, Type*> declared; // map variable names to values
-extern std::vector<Const*> rt_stack;
+extern std::vector<UnnamedLValue*> rt_stack;
 
 
 class Expr: public AST {
@@ -222,60 +218,6 @@ public:
 	bool isDynamic(){return dynamic;}
 protected:
 	bool dynamic;
-};
-
-
-class Id: public LValue {
-public:
-	Id(std::string v): name(v) {}
-	virtual void printOn(std::ostream &out) const override {
-		out << "Id(" << name << ")";
-	}
-	virtual Const* eval() override {
-		if(!globals_lookup()){//TODO error or uninitialized value
-			std::cout<<"ERROR: Id '"<<name<<"' not initialized!"<<std::endl;
-			return nullptr;/*TODO throw error not found*/
-		}
-		return globals[name];
-	}
-
-	virtual void sem() override{
-		if(!declared_lookup()){
-			//TODO throw error variable not declared
-			std::cout<<"Id '"<<name<<"' not declared"<<std::endl;
-		}
-	}
-
-	virtual void let(Const* c){
-		bool hasValue=globals_lookup();
-		if(hasValue) delete globals[name];
-		globals[name]=c;
-	}
-	virtual Type* get_type(){
-		return declared[name];
-	}
-	std::string get_name(){
-		return name;
-	}
-private:
-	std::string name;
-
-	bool declared_lookup(){//returns true if the id is declared
-		std::map<std::string,Type*>::iterator it;
-		it=declared.find(name);
-		if(it==declared.end()){
-			return false;
-		}
-		return true;
-	}
-	bool globals_lookup(){//returns true if the id already exists in globals
-		std::map<std::string,Const*>::iterator it;
-		it=globals.find(name);
-		if(it==globals.end()){
-			return false;
-		}
-		return true;
-	}
 };
 
 class UnnamedLValue: public LValue{
@@ -409,10 +351,63 @@ protected:
 inline UnnamedLValue* PtrType::create() const{
 	return new UnnamedLValue(new PtrType(type),true);
 }
-
 class Arrconst: public Const{
 public:
-	Arrconst(int s, Type* t):Const(  t ),size(s){
+	Arrconst(int s, Type* t):Const(t),size(s){}
+	virtual Const* clone() override{return this;}
+	virtual UnnamedLValue* get_element(int i)=0;
+
+protected:
+	int size;
+};
+
+class StaticArray: public Arrconst{
+public:
+	StaticArray(int s, Type* t, int o):Arrconst(s,t), offset(o){
+		child_size=find_child_size(t);
+
+		if(!t->get_name().compare("array")){
+			ArrType* arrT=static_cast<ArrType*>(t);
+			if(arrT->get_size()>0){
+				for(int i=0; i<s; i++){
+					rt_stack[offset+i*child_size]->let(
+						new StaticArray(
+							arrT->get_size(),
+							arrT->get_type(),
+							offset+i*child_size+1
+						)
+					);
+				}
+			}
+		}
+	}
+
+	virtual void printOn(std::ostream &out) const override {
+		out << "StaticArray( ["<<size<<"]"<<"of type "<< *type << ")";
+	}
+
+	virtual UnnamedLValue* get_element(int i){
+		return rt_stack[i*child_size+offset];
+	}
+
+private:
+	int find_child_size(Type* t){
+		if(!t->get_name().compare("array")){
+			ArrType* arrT=static_cast<ArrType*>(t);
+			int children=arrT->get_size();
+			if(children>0){
+				return children*find_child_size(arrT->get_type())+1;
+			}
+		}
+		return 1;
+	}
+	int offset;
+	int child_size;
+};
+
+class DynamicArray: public Arrconst{
+public:
+	DynamicArray(int s, Type* t):Arrconst(s,t){
 		if(s<0){
 			/*TODO error wrong value*/
 			std::cerr<<"ERROR: "<< s <<" is bad size for array!"<<std::endl;
@@ -423,11 +418,11 @@ public:
 			arr[i]=new UnnamedLValue(t);
 		}
 	}
-	~Arrconst(){
+	~DynamicArray(){
 		for (auto p:arr)
 			delete p;
 	}
-	LValue* get_element(int i){
+	UnnamedLValue* get_element(int i){
 		return arr[i];
 	}
 	void fromString(char* str){
@@ -436,32 +431,78 @@ public:
 		}
 	}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Arrconst([" << arr <<"] ["<<size<<"]"<<"of type "<< *type << ")";
-	}
-	virtual value get_value() const{
-		value v;
-		v.lval=arr[0];
-		return v;
+		out << "DynamicArray([" << arr <<"] ["<<size<<"]"<<"of type "<< *type << ")";
 	}
 protected:
 	std::vector<UnnamedLValue*> arr;
-	int size;
 };
 
+class Id: public LValue {
+public:
+	Id(std::string v): name(v), offset(-1),type(nullptr) {}
+	virtual void printOn(std::ostream &out) const override {
+		out << "Id(" << name <<"@"<<offset <<")";
+	}
+	virtual Const* eval() override {
+		Const *c = rt_stack[offset]->eval();
+		if(!c and !type->get_name().compare("array")){
+			ArrType* arrT=static_cast<ArrType*>(type);
+			create_static_array(arrT);
+			return rt_stack[offset]->eval();
+		}
+		else return c;
+	}
+
+	virtual void sem() override{
+		SymbolEntry *e = st.lookup(name);
+		if(!e){
+			//TODO throw error variable not declared
+			std::cerr<<"Id '"<<name<<"' not declared"<<std::endl;
+			exit(1);
+		}
+		type = e->type;
+		offset = e->offset;
+	}
+
+	virtual void let(Const* c){
+		rt_stack[offset]->let(c);
+	}
+	virtual Type* get_type(){
+		return type->clone();
+	}
+	std::string get_name(){
+		return name;
+	}
+
+	int get_offset(){
+		return offset;
+	}
+private:
+	std::string name;
+	int offset;
+	Type* type;
+
+	void create_static_array(ArrType* t){
+		Type* inside_t=t->get_type();
+		int s = t->get_size();
+		Const *c = new StaticArray(s,inside_t,offset+1);
+		rt_stack[offset]->let(c);
+	}
+};
 class Sconst: public UnnamedLValue {
 public:
 	Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::getInstance())) {
 		char* str=(char*)(malloc(sizeof(char)*(s.size()-1)));
 		s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
 		str[s.size()-2]='\0';
-		Arrconst* arr = new Arrconst(s.size()-1,CHARACTER::getInstance());
+		DynamicArray* arr = new DynamicArray(s.size()-1,CHARACTER::getInstance());
 		arr->fromString(str);
 		let(arr);
 	}
 };
 
 inline UnnamedLValue* ArrType::create() const{
-	return new UnnamedLValue(new Arrconst(size,type), new ArrType(size,type),true);
+	return new UnnamedLValue(new DynamicArray(size,type), new ArrType(size,type),true);
 }
 
 class Bconst: public Const {
@@ -1085,7 +1126,6 @@ public:
 		lvalue->sem();
 		Type* lType = lvalue->get_type();
 		Type* rType = expr->get_type();
-		std::cerr<<"<lType,rType>: <"<<*lType<<","<<*rType<<">"<<std::endl;
 		if(lType->doCompare(rType)) return;
 		else different_types=true;
 		if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
@@ -1490,7 +1530,7 @@ protected:
 				// declared arrays of FIXED size should
 				//   take more space in stack
 				Type* inside=arr_type->get_type();
-				return s*get_sizeof(inside);
+				return s*get_sizeof(inside)+1;
 			}
 		}
 		// non-static-array types have size 1 in stack
@@ -1562,10 +1602,10 @@ public:
 	}
 
 	void run() const{
-		for (int i = 0; i < size; ++i) rt_stack.push_back(nullptr);
+		for (int i = 0; i < size; ++i) rt_stack.push_back(new UnnamedLValue(nullptr));
 		statements->run();
 		print_stack();
-		for (int i = 0; i < size; ++i) rt_stack.pop_back();
+		for (int i = 0; i < size; ++i) {delete rt_stack.back(); rt_stack.pop_back();};
 	}
 
 	virtual void printOn(std::ostream &out) const override {
@@ -1587,7 +1627,7 @@ class Function:public Decl{
 	}
 
 	virtual void sem() override{
-		declared[id]=ret_type;
+		// declared[id]=ret_type;
 		formals->sem();
 	}
 protected:

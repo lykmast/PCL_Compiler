@@ -6,9 +6,7 @@
 #include <vector>
 
 SymbolTable st;
-std::map<std::string, Const*> globals; // map variable names to values
-std::map<std::string, Type*> declared; // map variable names to values
-std::vector<Const*> rt_stack;
+std::vector<UnnamedLValue*> rt_stack;
 %}
 
 %define parse.error verbose
@@ -93,8 +91,8 @@ std::vector<Const*> rt_stack;
 %%
 
 program:
-  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/$4->sem();std::cout<<"between sem and run"<<std::endl;$4->run();
-	std::cout<<"DECLARED: "<<declared<<std::endl<<"GLOBALS: "<<globals<<std::endl;}
+  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/$4->sem();std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();
+	std::cout << "AST: " << *$4 << std::endl; }
 ;
 
 body:
