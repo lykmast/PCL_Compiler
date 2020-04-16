@@ -129,7 +129,12 @@ class PtrType: public Type{
 public:
 	PtrType(Type* t):Type("pointer"),type(t){}
 	PtrType(std::string name,Type* t):Type(name),type(t){}//TODO erase
-	~PtrType(){if(type->should_delete()) delete type;}
+	~PtrType(){
+		std::cout<<"PtrType destructor"<<std::endl;
+		if(type)
+			if(type->should_delete())
+				delete type;
+	}
 	virtual UnnamedLValue* create() const;
 	virtual Type* clone(){
 		return new PtrType(type->clone());
@@ -156,7 +161,9 @@ class ArrType: public PtrType{
 public:
 	ArrType(int s,Type* t):PtrType("array",t),size(s){}
 	ArrType(Type* t):PtrType("array",t),size(-1){}
-	~ArrType(){if(type->should_delete()) delete type;}
+	~ArrType(){
+		std::cout<<"ArrType destructor"<<std::endl;
+	}
 	virtual Type* clone(){
 		return new ArrType(size,type->clone());
 	}
@@ -176,15 +183,80 @@ protected:
 	int size;
 };
 
+class CallableType: public Type{
+public:
+	CallableType(std::string func_type, std::vector<Type*> formalTs, std::vector<bool> ref):
+		Type(func_type), formal_types(formalTs), by_ref(ref){}
+		virtual bool should_delete() const override{
+			return true;
+		}
+		void typecheck_args(std::vector<Type*> arg_types){
+			if (arg_types.size()!=formal_types.size()){
+				std::cerr<<"Expected "<<formal_types.size()<<" arguments, "
+					<<arg_types.size()<<" were given."<<std::endl;
+					exit(1);
+			}
+			for(uint i=0; i<arg_types.size(); i++){
+				if(!formal_types[i]->doCompare(arg_types[i])){
+					std::cerr<<"Expected argument "<<i<<" to be "<<*formal_types[i]
+						<<" but it was "<<*arg_types[i]<<std::endl;
+						exit(1);
+				}
+			}
+		}
 
+		void check_passing(std::vector<bool> ref){
+			for(uint i=0; i<by_ref.size(); i++){
+				if(by_ref[i]!=ref[i]){
+					std::string whatis, whatisnt;
+					if(ref[i]){
+						whatis="by reference";
+						whatisnt="by value";
+					}
+					else{
+						whatisnt="by reference";
+						whatis="by value";
+					}
+					std::cerr<<"Expected argument "<<i<<"of "<<name<<" to be passed "<<whatisnt
+						<<", but it was passed "<<whatis<<"."<<std::endl;
+						exit(1);
+				}
+			}
+		}
+		std::vector<bool> get_by_ref(){
+			return by_ref;
+		}
+protected:
+	std::vector<Type*> formal_types;
+	std::vector<bool> by_ref;
+};
 
-extern std::vector<UnnamedLValue*> rt_stack;
+class FunctionType: public CallableType{
+public:
+	FunctionType( Type* ret_ty ,std::vector<Type*> formalTs, std::vector<bool> ref):
+		CallableType("function", formalTs, ref),ret_type(ret_ty){}
+		Type* get_ret_type(){
+			return ret_type->clone();
+		}
 
+private:
+	Type* ret_type;
+};
+
+class ProcedureType: public CallableType{
+public:
+	ProcedureType(std::vector<Type*> formalTs, std::vector<bool> ref):
+		CallableType("procedure", formalTs, ref){}
+};
+
+extern std::vector<LValue*> rt_stack;
+extern unsigned long fp;
 
 class Expr: public AST {
 public:
 	virtual Const* eval() = 0;
 	virtual Type* get_type()=0;
+	virtual bool isLValue() const{return false;}
 };
 
 class Stmt: virtual public AST {
@@ -193,12 +265,24 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Stmt()";
 	}
+	virtual bool isReturn(){return false;}
 };
 
+class Return: public Stmt{
+public:
+	virtual void printOn(std::ostream &out) const override {
+		out << "Return";
+	}
+	virtual bool isReturn() override{return true;}
+};
 class Const: public Expr{
 public:
 	Const(Type* ty):type(ty){}
-	~Const(){if(type->should_delete()) delete type;}
+	~Const(){
+		if(type)
+			if(type->should_delete())
+				delete type;
+	}
 	virtual Type* get_type() override{return type->clone();}
 	virtual void printOn(std::ostream &out) const =0;
 	virtual Const* clone()=0;
@@ -216,6 +300,7 @@ public:
 	LValue(bool dyn=false):dynamic(dyn){}
 	virtual void let(Const* c)=0;
 	bool isDynamic(){return dynamic;}
+	virtual bool isLValue() const override{return true;}
 protected:
 	bool dynamic;
 };
@@ -224,7 +309,12 @@ class UnnamedLValue: public LValue{
 public:
 	UnnamedLValue(Type *ty,bool dyn=false):LValue(dyn),value(nullptr),type(ty){}
 	UnnamedLValue(Const* val, Type* ty,bool dyn=false):LValue(dyn),value(val),type(ty){}
-	~UnnamedLValue(){delete value;}
+	~UnnamedLValue(){
+		delete value;
+		if(type)
+			if(type->should_delete())
+				delete type;
+	}
 	virtual void printOn(std::ostream &out) const override {
 		if(value)
 			out << "UnnamedLValue(" << *value<<","<<*type << ")";
@@ -323,6 +413,9 @@ class Pconst: public Const {
 public:
 	Pconst():Const(new PtrType(ANY::getInstance())),ptr(nullptr){}//TODO implement for pointers different than nil
 	virtual Const* clone() override{return new Pconst(*this);}
+	~Pconst(){
+		std::cout<<"Pconst destructor does nothing"<<std::endl;
+	}
 	Pconst(LValue* pval,Type *t):Const(new PtrType(t) ),ptr(pval){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Pconst(" << ptr << "of type "<<*type<< ")";
@@ -355,7 +448,7 @@ class Arrconst: public Const{
 public:
 	Arrconst(int s, Type* t):Const(t),size(s){}
 	virtual Const* clone() override{return this;}
-	virtual UnnamedLValue* get_element(int i)=0;
+	virtual LValue* get_element(int i)=0;
 
 protected:
 	int size;
@@ -386,7 +479,7 @@ public:
 		out << "StaticArray( ["<<size<<"]"<<"of type "<< *type << ")";
 	}
 
-	virtual UnnamedLValue* get_element(int i){
+	virtual LValue* get_element(int i){
 		return rt_stack[i*child_size+offset];
 	}
 
@@ -415,14 +508,14 @@ public:
 		}
 		arr.resize(s);
 		for(int i=0;i<s;i++){
-			arr[i]=new UnnamedLValue(t);
+			arr[i]=t->create();
 		}
 	}
 	~DynamicArray(){
 		for (auto p:arr)
 			delete p;
 	}
-	UnnamedLValue* get_element(int i){
+	LValue* get_element(int i){
 		return arr[i];
 	}
 	void fromString(char* str){
@@ -439,16 +532,17 @@ protected:
 
 class Id: public LValue {
 public:
-	Id(std::string v): name(v), offset(-1),type(nullptr) {}
+	Id(std::string v): name(v), offset(-1), decl_nesting(0), current_nesting(0), type(nullptr) {}
 	virtual void printOn(std::ostream &out) const override {
-		out << "Id(" << name <<"@"<<offset <<")";
+		out << "Id(" << name <<"@"<<offset<<":"<<decl_nesting<<")";
 	}
 	virtual Const* eval() override {
-		Const *c = rt_stack[offset]->eval();
+		int abs_ofs=find_absolute_offset();
+		Const *c = rt_stack[abs_ofs]->eval();
 		if(!c and !type->get_name().compare("array")){
 			ArrType* arrT=static_cast<ArrType*>(type);
-			create_static_array(arrT);
-			return rt_stack[offset]->eval();
+			create_static_array(abs_ofs, arrT);
+			return rt_stack[abs_ofs]->eval();
 		}
 		else return c;
 	}
@@ -462,10 +556,12 @@ public:
 		}
 		type = e->type;
 		offset = e->offset;
+		decl_nesting = e->nesting;
+		current_nesting=st.getNestingOfCurrentScope();
 	}
 
 	virtual void let(Const* c){
-		rt_stack[offset]->let(c);
+		rt_stack[find_absolute_offset()]->let(c);
 	}
 	virtual Type* get_type(){
 		return type->clone();
@@ -480,13 +576,23 @@ public:
 private:
 	std::string name;
 	int offset;
+	int decl_nesting;
+	int current_nesting;
 	Type* type;
 
-	void create_static_array(ArrType* t){
+	void create_static_array(int abs_ofs, ArrType* t){
 		Type* inside_t=t->get_type();
 		int s = t->get_size();
-		Const *c = new StaticArray(s,inside_t,offset+1);
-		rt_stack[offset]->let(c);
+		Const *c = new StaticArray(s,inside_t,abs_ofs+1);
+		rt_stack[abs_ofs]->let(c);
+	}
+
+	int find_absolute_offset(){
+		int prev_fp=fp;
+		for(int diff=current_nesting-decl_nesting; diff>0; diff--){
+			prev_fp=rt_stack[prev_fp]->eval()->get_value().i;
+		}
+		return prev_fp+offset;
 	}
 };
 class Sconst: public UnnamedLValue {
@@ -1434,6 +1540,10 @@ public:
 		list.insert(list.end(),l->list.begin(),l->list.end());
 		delete l;
 	}
+
+	uint size(){
+		return list.size();
+	}
 	friend class Body;
 protected:
 	std::vector<T*> list;
@@ -1452,8 +1562,11 @@ public:
 		}
 	}
 	virtual void run() const{
-		for(auto p:list)
+		for(auto p:list){
+			if(p->isReturn())
+				return;
 			p->run();
+		}
 	}
 };
 class ExprList: public List<Expr> {
@@ -1463,15 +1576,37 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "ExprList(" << list << ")";
 	}
-	virtual std::vector<Const*> eval(){
-		std::vector<Const*> ret(list.size());
+	virtual std::vector<Expr*> eval(std::vector<bool> by_ref){
+		std::vector<Expr*> ret(list.size());
 		Const *c;
-		for(auto p:list){
-			c=p->eval();
-			ret.push_back(c);
+		for(uint i=0; i<list.size(); i++){
+			if(by_ref[i]){
+				ret.push_back(list[i]);
+			}
+			else{
+				c=list[i]->eval();
+				ret.push_back(c);
+			}
 		}
 		return ret;
 	}
+
+	virtual std::vector<Type*> get_type(){
+		std::vector<Type*> ret(list.size());
+		for(auto p:list){
+			ret.push_back(p->get_type());
+		}
+		return ret;
+	}
+
+	virtual std::vector<bool> get_isLValue(){
+		std::vector<bool> ret(list.size());
+		for(auto p:list){
+			ret.push_back(p->isLValue());
+		}
+		return ret;
+	}
+
 private:
 	std::vector<Expr*> list;
 };
@@ -1488,6 +1623,7 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Decl(" << decl_type <<":"<<id<<")";
 	}
+	virtual Type* get_type(){return nullptr;}
 	std::string get_id(){return id;}
 protected:
 	std::string id;
@@ -1499,6 +1635,9 @@ public:
 	LabelDecl(Decl* d):Decl(d->get_id(),"label"){delete d;}
 	virtual void printOn(std::ostream &out) const override {
 		out << "LabelDecl("<<id<<")";
+	}
+	virtual Type* get_type() override{
+		return LABEL::getInstance();
 	}
 	virtual void sem() override{
 		st.insert(id,LABEL::getInstance());
@@ -1513,6 +1652,9 @@ public:
 		out << "VarDecl(" <<id<<" of type "<< *type << ")";
 		else
 		out << "VarDecl(" <<id<<" of type NOTSET)";
+	}
+	virtual Type* get_type() override{
+		return type->clone();
 	}
 	virtual void sem() override{
 		int s=get_sizeof(type);
@@ -1574,8 +1716,25 @@ public:
 			*p=d;
 		}
 	}
+	std::vector<Type*> get_type(){
+		std::vector<Type*> types;
+		for(auto p=list.begin();p!=list.end();p++){
+			types.push_back((*p)->get_type());
+		}
+		return types;
+	}
 };
-
+class FormalDeclList: public DeclList{
+public:
+	std::vector<bool> get_by_ref(){
+		std::vector<bool> by_ref;
+		for(auto p=list.begin();p!=list.end();p++){
+			FormalDecl* f=static_cast<FormalDecl*>(*p);
+			by_ref.push_back(f->isByRef());
+		}
+		return by_ref;
+	}
+};
 inline void print_stack(){
 	std::cout<<"STACK:"<<std::endl;
 	for(auto p : rt_stack ){
@@ -1590,61 +1749,308 @@ inline void print_stack(){
 
 class Body: public AST{
 public:
-	Body(DeclList* d, StmtList* s):declarations(d),statements(s),size(0){}
+	Body():declarations(nullptr),statements(nullptr),size(0),defined(false){}
+	Body(DeclList* d, StmtList* s):declarations(d),statements(s),size(0),defined(true){}
 	~Body(){delete declarations; delete statements;}
 
 	virtual void sem() override{
-		st.openScope();
+		if(!isDefined()){
+			return;
+		}
 		declarations->sem();
 		statements->sem();
 		size = st.getSizeOfCurrentScope();
-		st.closeScope();
+	}
+	void add_body(Body *b){
+		defined=true;
+		declarations=b->declarations;
+		statements=b->statements;
+		// b->declarations=nullptr;
+		// b->statements=nullptr;
+		// delete b;
 	}
 
 	void run() const{
-		for (int i = 0; i < size; ++i) rt_stack.push_back(new UnnamedLValue(nullptr));
 		statements->run();
 		print_stack();
-		for (int i = 0; i < size; ++i) {delete rt_stack.back(); rt_stack.pop_back();};
+	}
+	bool isDefined(){
+		return defined;
 	}
 
 	virtual void printOn(std::ostream &out) const override {
 		out << "Body("<<*declarations<<","<<*statements<<")";
 	}
+
+	int get_size(){
+		return size;
+	}
 protected:
 	DeclList* declarations;
 	StmtList* statements;
 	int size;
+	bool defined;
 };
 
-class Function:public Decl{
-	Function(std::string name,DeclList *decl_list, Type* return_type)
-		:Decl(name,"function"), ret_type(return_type),
-		 body(nullptr), formals(decl_list){}
+class Procedure:public Decl{
+public:
+	Procedure(std::string name, DeclList *decl_list, Body* bod, std::string decl_type="procedure"):
+		Decl(name,decl_type), body(bod),formals(static_cast<FormalDeclList*>(decl_list)){}
+		void add_body(Body* bod){
+			if(body->isDefined()){
+				std::cerr<<id<<" already has body."<<std::endl;
+				exit(1);
+			}
+			body->add_body(bod);
+		}
+		virtual void sem() override{
+			std::vector<Type*> formal_types=formals->get_type();
+			std::vector<bool> by_ref=formals->get_by_ref();
+			if(!body->isDefined()){
+				CallableType *proc_type=new ProcedureType(formal_types, by_ref);
+				st.insert_function(id,proc_type,body);
+				return;
+			}
+			FunctionEntry* e = st.function_decl_lookup(id);
+			if(e and e->body->isDefined()){
+				std::cerr<<"Procedure "<<id<<" already fully declared."<<std::endl;
+				exit(1);
+			}
+			if(e){
+				if(e->type->get_name().compare(decl_type)){
+					std::cerr<<"Previous declaration of "<<id<<" is not a "<<decl_type<<"."<<std::endl;
+					exit(1);
+				}
+				ProcedureType* proc_type=static_cast<ProcedureType*>(e->type);
+				proc_type->typecheck_args(formal_types);
+				proc_type->check_passing(by_ref);
+				e->body->add_body(body);
+			}
+			else{
+				CallableType *proc_type=new ProcedureType(formal_types, by_ref);
+				st.insert_function(id, proc_type, body);
+			}
 
-	void add_body(Body* bod){
-		body=bod;
-	}
+			st.openScope();
+			formals->sem();
+			body->sem();
+			st.closeScope();
+		}
+protected:
+	Body* body;
+	FormalDeclList* formals;
+};
+
+class Function:public Procedure{
+public:
+	Function(std::string name, DeclList *decl_list, Type* return_type, Body* bod)
+		:Procedure(name,decl_list,bod,"function"), ret_type(return_type){}
+
 
 	virtual void sem() override{
-		// declared[id]=ret_type;
+		std::vector<Type*> formal_types=formals->get_type();
+		std::vector<bool> by_ref=formals->get_by_ref();
+		if(!body->isDefined()){
+			CallableType *func_type=new FunctionType(ret_type, formal_types, by_ref);
+			st.insert_function(id,func_type,body);
+			return;
+		}
+		FunctionEntry* e = st.function_decl_lookup(id);
+		if(e and e->body->isDefined()){
+			std::cerr<<"Function "<<id<<" already fully declared."<<std::endl;
+			exit(1);
+		}
+		if(e){
+			if(e->type->get_name().compare(decl_type)){
+				std::cerr<<"Previous declaration of "<<id<<" is not a "<<decl_type<<"."<<std::endl;
+				exit(1);
+			}
+			FunctionType* func_type=static_cast<FunctionType*>(e->type);
+			Type* ret_t=func_type->get_ret_type();
+			if(!ret_t->doCompare(ret_type)){
+				std::cerr<<"Can't declare function "<<id<<" with different return type."<<std::endl;
+				exit(1);
+			}
+			func_type->typecheck_args(formal_types);
+			func_type->check_passing(by_ref);
+			e->body->add_body(body);
+		}
+		else{
+			CallableType *func_type=new FunctionType(ret_type, formal_types, by_ref);
+			st.insert_function(id, func_type, body);
+		}
+
+		st.openScope();
+		VarDecl v(new Decl("result","var"),ret_type); v.sem();
 		formals->sem();
+		body->sem();
+		st.closeScope();
 	}
+
 protected:
 	Type* ret_type;
-	Body* body;
-	DeclList* formals;
+
 };
 
-
-/*class Body: public AST{
-	Body(List<Local* > *l,List<Stmt*> *s):locals(l),stmts(s){}
-	virtual void run() const override{
-		locals->run();
-		stmts->run();
+class Program: public AST{
+public:
+	Program(std::string nam, Body* bod):name(nam),body(bod),size(0){}
+	virtual void printOn(std::ostream &out) const override {
+		out << "Program(" << name <<" ::: "<<*body<< ")";
 	}
-protected:
-	List<Local* > *locals;
-	List<Stmt*> *stmts;
+		virtual void sem() override{
+			st.openScope();
+			body->sem();
+			size=st.getSizeOfCurrentScope();
+			st.closeScope();
+		}
+		void run(){
+			fp=0;
+			for(int i=0; i<body->get_size()+1; i++){
+				rt_stack.push_back(new UnnamedLValue(nullptr));
+			}
+			body->run();
+			for(int i=0; i<body->get_size()+1; i++){
+				delete rt_stack.back();
+				rt_stack.pop_back();
+			}
+		}
+private:
+	std::string name;
+	Body* body;
+	int size;
 };
-*/
+
+class Call{
+public:
+	Call(std::string nam, ExprList* exp): name(nam), exprs(exp),
+		by_ref(exp->size()), nesting_diff(0), next_fp_offset(0), body(nullptr){}
+protected:
+	std::string name;
+	ExprList* exprs;
+	std::vector<bool> by_ref;
+	int nesting_diff;
+	int next_fp_offset;
+	Body* body;
+
+	FunctionEntry* check_passing(){
+		std::vector<Type*> types=exprs->get_type();
+		FunctionEntry* e = st.function_lookup(name);
+		e->type->typecheck_args(types);
+		by_ref=e->type->get_by_ref();
+		std::vector<bool> isLValue (exprs->get_isLValue());
+		for(uint i=0; i<by_ref.size(); i++){
+			if(by_ref[i] and not isLValue[i]){
+				std::cerr<<"Argument "<<i<<" is wrong side value."<<std::endl;
+				exit(1);
+			}
+		}
+		nesting_diff=st.getNestingOfCurrentScope()-e->nesting;
+		next_fp_offset=st.getSizeOfCurrentScope()+1;
+		return e;
+
+	}
+
+	void before_run(bool isFunction=false) const{
+		int next_fp=fp+next_fp_offset;
+		if(nesting_diff<0){
+			rt_stack[next_fp]=new UnnamedLValue(new Iconst(fp),INTEGER::getInstance());
+		}
+		else{
+			int prev_fp=fp;
+			for(int diff=nesting_diff; diff>0; diff--){
+				prev_fp=rt_stack[prev_fp]->eval()->get_value().i;
+			}
+			Const* c=rt_stack[prev_fp]->eval();
+			rt_stack[next_fp]=new UnnamedLValue(c,INTEGER::getInstance());
+
+		}
+		if(isFunction){
+			// push one more value for function result
+			rt_stack.push_back(new UnnamedLValue(nullptr));
+		}
+		std::vector<Expr*> args(exprs->eval(by_ref));
+		for(uint i=0; i<args.size(); i++){
+			if(by_ref[i]){
+				rt_stack.push_back(static_cast<LValue*>(args[i]));
+			}
+			else{
+				rt_stack.push_back(new UnnamedLValue(static_cast<Const*>(args[i]),args[i]->get_type()));
+			}
+		}
+		int size=body->get_size()-exprs->size()-1;
+		for (int i = 0; i < size; ++i) rt_stack.push_back(new UnnamedLValue(nullptr));
+		rt_stack[next_fp-1]=new UnnamedLValue(new Iconst(fp),INTEGER::getInstance());
+		fp=next_fp;
+	}
+
+	void after_run() const{
+		int next_fp=fp;
+		fp=rt_stack[next_fp-1]->eval()->get_value().i;
+		int size=next_fp_offset-exprs->size()-1;
+		for (int i = 0; i < size; ++i) {delete rt_stack.back(); rt_stack.pop_back();}
+		for(uint i=by_ref.size()-1; i>=0; i--){
+			if(!by_ref[i]){
+				delete rt_stack.back();
+			}
+			rt_stack.pop_back();
+		}
+		delete rt_stack[next_fp];
+		rt_stack.pop_back();
+		delete rt_stack[next_fp-1];
+		rt_stack.pop_back();
+	}
+
+
+};
+
+class ProcCall: public Call, public Stmt{
+public:
+	ProcCall(std::string nam, ExprList* exp):Call(nam, exp){}
+	virtual void sem() override{
+		FunctionEntry* e =check_passing();
+		if(e->type->get_name().compare("procedure")){
+			std::cerr<<"Can't call function "<<name<<" as a procedure."<<std::endl;
+			exit(1);
+		}
+	}
+	virtual void run() const override{
+		before_run();
+		body->run();
+		after_run();
+	}
+	virtual void printOn(std::ostream &out) const override {
+		out << "ProcCall(" << name<<", args:"<< *exprs<< ")";
+	}
+};
+
+class FunctionCall: public Call, public Expr{
+public:
+	FunctionCall(std::string nam, ExprList* exp):Call(nam,exp), type(nullptr){}
+	virtual void sem() override{
+		FunctionEntry* e = check_passing();
+		if(e->type->get_name().compare("function")){
+			std::cerr<<"Can't call procedure "<<name<<" as a function."<<std::endl;
+			exit(1);
+		}
+		type=static_cast<FunctionType*>(e->type)->get_ret_type();
+	}
+	virtual Type* get_type(){
+		return type;
+	}
+
+	virtual Const* eval() override{
+		before_run(true); // flag for function
+		body->run();
+		Const* res = rt_stack[fp+1]->eval();
+		delete rt_stack[fp+1];
+		after_run();
+		rt_stack.pop_back();
+		return res;
+	}
+	virtual void printOn(std::ostream &out) const override {
+		out << "FunctionCall(" << name<<"with return type "<<*type<<", args:"<< *exprs<< ")";
+	}
+private:
+	Type* type;
+};

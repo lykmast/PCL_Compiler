@@ -6,7 +6,8 @@
 #include <vector>
 
 SymbolTable st;
-std::vector<UnnamedLValue*> rt_stack;
+std::vector<LValue*> rt_stack;
+unsigned long fp;
 %}
 
 %define parse.error verbose
@@ -65,10 +66,12 @@ std::vector<UnnamedLValue*> rt_stack;
 %nonassoc BRACKETS
 
 %union{
+	Program* program;
 	Body* body;
 	Stmt* stmt;
 	ExprList* exprList;
 	DeclList* declList;
+	Procedure* proc;
 	StmtList* stmtList;
 	Expr* expr;
 	Type* type;
@@ -78,22 +81,24 @@ std::vector<UnnamedLValue*> rt_stack;
 	double numd;
 	char ch;
 }
-
-%type<body> program body
+%type<program> program;
+%type<body> body
 %type<stmtList> block mult_stmts
 %type<declList> mult_locals local var_decl mult_ids args mult_formals formal
 %type<exprList> params mult_exprs
-%type<stmt> stmt
-%type<expr> expr r_value call
+%type<stmt> stmt proc_call
+%type<expr> expr r_value fun_call
 %type<lvalue> l_value_ref l_value
 %type<type> type full_type
-
+%type<proc> header
 %%
 
 program:
-  "program" T_id ';' body '.' {std::cout << "AST: " << *$4 << std::endl; /*TODO $$ = new Program($2,$4);*/$4->sem();std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();
-	std::cout << "AST: " << *$4 << std::endl; }
+  "program" T_id ';' body '.' {$$=new Program(*$2,$4); $$->sem(); $$->run();}
 ;
+
+// {std::cout << "AST: " << *$4 << std::endl; $$ = new Program($4);std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();
+//  std::cout << "AST: " << *$4 << std::endl; }
 
 body:
   mult_locals block {$$=new Body($1,$2);}
@@ -107,8 +112,8 @@ mult_locals:
 local:
   "var" var_decl {$$ = $2;}
 | "label" mult_ids ';' {$2->toLabel(); $$=$2;}
-| header ';' body ';' {/*TODO $1->body($3); $$=$1;*/}
-| "forward" header ';' {/*TODO $$ = new Forward($2);*/}
+| header ';' body ';' {$1->add_body($3); $$=new DeclList($1);}
+| "forward" header ';' {$$ = new DeclList($2);}
 ;
 
 var_decl:
@@ -141,8 +146,8 @@ full_type:
 ;
 
 header:
-  "procedure" T_id '(' args ')' {/*TODO $$ = new Function($2,$4,new Type("void"));*/}
-| "function" T_id '(' args ')' ':' type {/*TODO $$ = new Function($2,$4,$6);*/}
+  "procedure" T_id '(' args ')' {$$ = new Procedure(*$2,$4, new Body());}
+| "function" T_id '(' args ')' ':' type {$$ = new Function(*$2,$4,$7, new Body());}
 ;
 
 args:
@@ -161,7 +166,7 @@ formal:
 ;
 
 block:
-  "begin" mult_stmts "end" {$$=$2;}
+  "begin" mult_stmts "end" {$$=$2; std::cout<<*($2)<<std::endl; /*DEBUG*/}
 ;
 
 mult_stmts:
@@ -171,15 +176,15 @@ mult_stmts:
 
 stmt:
 /*nothing*/ {$$ = new Stmt();}
-| l_value ":=" expr {$$ = new Let($1,$3);}
+| l_value ":=" expr {$$ = new Let($1,$3); }
 | block {$$= $1;}
-| call {$$= new Stmt();/*TODO $$= new Stmt($1);*/ /*call can be a statement only if it is a proc call*/}
+| proc_call {$$=$1; /*call can be a statement only if it is a proc call*/}
 | "if" expr "then" stmt "else" stmt {$$ = new If($2,$4,$6);}
 | "if" expr "then" stmt {$$ = new If($2,$4,nullptr);}
 | "while" expr "do" stmt {$$ = new While($2, $4);}
 | T_id ':' stmt { $$=$3;/*TODO $3->target($1); $$=$3; */}
 | "goto" T_id { $$=new Stmt();/*TODO $$ = new Goto($2);*/ }
-| "return" {$$=new Stmt();/*TODO $$ = new Return();*/}
+| "return" {$$ = new Return();}
 | "new" '[' expr ']' l_value {$$ = new New($5,$3);}
 | "new" l_value {$$=new New($2,nullptr);}
 | "dispose" '[' ']' l_value {$$ = new DisposeArr($4);}
@@ -214,7 +219,7 @@ r_value:
 | "false" {$$ = new Bconst("false");}
 | '(' r_value ')' {$$ = $2;}
 | "nil" {$$ = new Pconst(); /*pointer constant*/}
-| call {$$ = $1;}
+| fun_call {$$ = $1;}
 | '@' l_value_ref {$$ = new Reference($2);}
 | expr '+' expr {$$ = new Op($1,"+",$3);}
 | expr '-' expr {$$ = new Op($1,"-",$3);}
@@ -235,8 +240,12 @@ r_value:
 | '-' expr %prec UMINUS {$$ = new Op("-",$2);}
 ;
 
-call:
-  T_id '('params')' {/*TODO $$ = new Call($1,$3);*/}
+fun_call:
+  T_id '('params')' {$$ = new FunctionCall(*$1,$3);}
+;
+
+proc_call:
+  T_id '('params')' {$$ = new ProcCall(*$1,$3);}
 ;
 
 params:
