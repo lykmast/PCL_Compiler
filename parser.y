@@ -6,7 +6,7 @@
 #include <vector>
 
 SymbolTable st;
-std::vector<LValue*> rt_stack;
+std::vector<UnnamedLValue*> rt_stack;
 unsigned long fp;
 %}
 
@@ -94,7 +94,10 @@ unsigned long fp;
 %%
 
 program:
-  "program" T_id ';' body '.' {$$=new Program(*$2,$4); $$->sem(); $$->run();}
+  "program" T_id ';' body '.'
+  		{$$=new Program(*$2,$4);
+	    std::cout<<"before sem: "<<*$$<<std::endl; $$->sem();
+       std::cout<<"after sem: "<<*$$<<std::endl; $$->run();}
 ;
 
 // {std::cout << "AST: " << *$4 << std::endl; $$ = new Program($4);std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();

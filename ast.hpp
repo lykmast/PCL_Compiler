@@ -250,7 +250,7 @@ public:
 		CallableType("procedure", formalTs, ref){}
 };
 
-extern std::vector<LValue*> rt_stack;
+extern std::vector<UnnamedLValue*> rt_stack;
 extern unsigned long fp;
 
 class Expr: public AST {
@@ -300,6 +300,7 @@ class LValue: public Expr{
 public:
 	LValue(bool dyn=false):dynamic(dyn){}
 	virtual void let(Const* c)=0;
+	virtual UnnamedLValue* getBox()=0;
 	bool isDynamic(){return dynamic;}
 	virtual bool isLValue() const override{return true;}
 protected:
@@ -331,6 +332,9 @@ public:
 			if(type->should_delete())
 				delete type;
 		type=c->get_type();
+	}
+	virtual UnnamedLValue* getBox() override{
+		return this;
 	}
 	virtual Const* eval() override{
 		if(value)
@@ -561,6 +565,10 @@ public:
 
 	virtual void let(Const* c){
 		rt_stack[find_absolute_offset()]->let(c);
+	}
+
+	virtual UnnamedLValue* getBox() override{
+		return rt_stack[find_absolute_offset()]->getBox();
 	}
 	virtual Type* get_type(){
 		return type->clone();
@@ -1172,6 +1180,12 @@ public:
 		(v.lval)->let(c);
 	}
 
+	virtual UnnamedLValue* getBox() override{
+		Const* con = expr->eval();
+		value v = con->get_value();
+		return (v.lval)->getBox();
+	}
+
 protected:
 	Expr *expr;
 };
@@ -1204,6 +1218,10 @@ public:
 	}
 	virtual void let(Const* c){
 		element()->let(c);
+	}
+
+	virtual UnnamedLValue* getBox() override{
+		return element()->getBox();
 	}
 	virtual Type* get_type(){
 		Type* l_ty = lvalue->get_type();
@@ -1989,8 +2007,11 @@ protected:
 
 	void before_run(bool isFunction=false) const{
 		int next_fp=fp+next_fp_offset;
+		// push current fp at next_fp-1 offset in stack
+		rt_stack.push_back(new UnnamedLValue(new Iconst(fp),INTEGER::getInstance())); //next_fp-1
+		// push access link at next_fp offset in stack
 		if(nesting_diff<0){
-			rt_stack[next_fp]=new UnnamedLValue(new Iconst(fp),INTEGER::getInstance());
+			rt_stack.push_back(new UnnamedLValue(new Iconst(fp),INTEGER::getInstance())); //next_fp
 		}
 		else{
 			int prev_fp=fp;
@@ -1998,41 +2019,58 @@ protected:
 				prev_fp=rt_stack[prev_fp]->eval()->get_value().i;
 			}
 			Const* c=rt_stack[prev_fp]->eval();
-			rt_stack[next_fp]=new UnnamedLValue(c,INTEGER::getInstance());
+			rt_stack.push_back(new UnnamedLValue(c,INTEGER::getInstance())); //next_fp
 
 		}
 		if(isFunction){
-			// push one more value for function result
+			// push one more value for function result at next_fp+1 offset
 			rt_stack.push_back(new UnnamedLValue(nullptr));
 		}
+		// push arguments in stack (lvalues for references)
 		std::vector<Expr*> args(exprs->eval(by_ref));
 		for(uint i=0; i<args.size(); i++){
 			if(by_ref[i]){
-				rt_stack.push_back(static_cast<LValue*>(args[i]));
+				rt_stack.push_back(static_cast<LValue*>(args[i])->getBox());
 			}
 			else{
 				rt_stack.push_back(new UnnamedLValue(static_cast<Const*>(args[i]),args[i]->get_type()));
 			}
 		}
+		// push empty spaces for callee locals (body size-arguments that are already pushed)
 		int size=body->get_size()-exprs->size()-1;
+		if(isFunction)
+			size-=1;
 		for (int i = 0; i < size; ++i) rt_stack.push_back(new UnnamedLValue(nullptr));
-		rt_stack[next_fp-1]=new UnnamedLValue(new Iconst(fp),INTEGER::getInstance());
+		// set fp to next
 		fp=next_fp;
 	}
 
-	void after_run() const{
+	void after_run(bool isFunction=false) const{
+		// restore old fp (stack[next_fp-1])
 		int next_fp=fp;
 		fp=rt_stack[next_fp-1]->eval()->get_value().i;
-		int size=next_fp_offset-exprs->size()-1;
+		// pop locals and arguments from stack
+		int size=body->get_size()-exprs->size()-1;
+		if(isFunction)
+			size-=1;
 		for (int i = 0; i < size; ++i) {delete rt_stack.back(); rt_stack.pop_back();}
-		for(uint i=by_ref.size()-1; i>=0; i--){
+		for(int i=by_ref.size()-1; i>=0; i--){
 			if(!by_ref[i]){
 				delete rt_stack.back();
 			}
 			rt_stack.pop_back();
 		}
+
+
+		if(isFunction){
+			// pop result
+			delete rt_stack.back();
+			rt_stack.pop_back();
+		}
+		// pop access link
 		delete rt_stack[next_fp];
 		rt_stack.pop_back();
+		// pop old fp
 		delete rt_stack[next_fp-1];
 		rt_stack.pop_back();
 	}
@@ -2078,14 +2116,16 @@ public:
 	virtual Const* eval() override{
 		before_run(true); // flag for function
 		body->run();
+		// take function result from stack[fp+1]
 		Const* res = rt_stack[fp+1]->eval();
-		delete rt_stack[fp+1];
-		after_run();
-		rt_stack.pop_back();
+		after_run(true);
 		return res;
 	}
 	virtual void printOn(std::ostream &out) const override {
-		out << "FunctionCall(" << name<<"with return type "<<*type<<", args:"<< *exprs<< ")";
+		if(type)
+			out << "FunctionCall(" << name<<"with return type "<<*type<<", args:"<< *exprs<< ")";
+		else
+			out << "FunctionCall(" << name<<"with return type <unknown>, args:"<< *exprs<< ")";
 	}
 private:
 	Type* type;
