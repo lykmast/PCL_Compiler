@@ -1552,6 +1552,10 @@ public:
 		delete l;
 	}
 
+	T* operator [](int i){
+		return list[i];
+	}
+
 	uint size(){
 		return list.size();
 	}
@@ -1559,6 +1563,9 @@ public:
 protected:
 	std::vector<T*> list;
 };
+
+inline void print_stack();
+
 
 class StmtList: public List<Stmt>, public Stmt{
 public:
@@ -1589,14 +1596,12 @@ public:
 	}
 	virtual std::vector<Expr*> eval(std::vector<bool> by_ref){
 		std::vector<Expr*> ret(list.size());
-		Const *c;
 		for(uint i=0; i<list.size(); i++){
 			if(by_ref[i]){
-				ret.push_back(list[i]);
+				ret[i]=list[i];
 			}
 			else{
-				c=list[i]->eval();
-				ret.push_back(c);
+				ret[i]=list[i]->eval();
 			}
 		}
 		return ret;
@@ -1617,9 +1622,6 @@ public:
 		}
 		return ret;
 	}
-
-private:
-	std::vector<Expr*> list;
 };
 
 
@@ -1776,9 +1778,6 @@ public:
 		defined=true;
 		declarations=b->declarations;
 		statements=b->statements;
-		// b->declarations=nullptr;
-		// b->statements=nullptr;
-		// delete b;
 	}
 
 	void run() const{
@@ -1807,6 +1806,12 @@ class Procedure:public Decl{
 public:
 	Procedure(std::string name, DeclList *decl_list, Body* bod, std::string decl_type="procedure"):
 		Decl(name,decl_type), body(bod),formals(static_cast<FormalDeclList*>(decl_list)){}
+		virtual void printOn(std::ostream &out) const override {
+			if(body)
+				out << decl_type<<"("<<*formals<<",,,"<<*body<<")";
+			else
+				out<<decl_type<<"(<forward>,"<<*formals<<")";
+		}
 		void add_body(Body* bod){
 			if(body->isDefined()){
 				std::cerr<<id<<" already has body."<<std::endl;
@@ -1857,7 +1862,6 @@ public:
 	Function(std::string name, DeclList *decl_list, Type* return_type, Body* bod)
 		:Procedure(name,decl_list,bod,"function"), ret_type(return_type){}
 
-
 	virtual void sem() override{
 		std::vector<Type*> formal_types=formals->get_type();
 		std::vector<bool> by_ref=formals->get_by_ref();
@@ -1892,6 +1896,7 @@ public:
 		}
 
 		st.openScope();
+		// declare result of function as first local of function (offset 1 from fp)
 		VarDecl v(new Decl("result","var"),ret_type); v.sem();
 		formals->sem();
 		body->sem();
@@ -1916,12 +1921,13 @@ public:
 			st.closeScope();
 		}
 		void run(){
+			rt_stack.push_back(new UnnamedLValue(new Iconst(0),INTEGER::getInstance()));
 			fp=0;
-			for(int i=0; i<body->get_size()+1; i++){
+			for(int i=0; i<body->get_size()-1; i++){
 				rt_stack.push_back(new UnnamedLValue(nullptr));
 			}
 			body->run();
-			for(int i=0; i<body->get_size()+1; i++){
+			for(int i=0; i<body->get_size(); i++){
 				delete rt_stack.back();
 				rt_stack.pop_back();
 			}
