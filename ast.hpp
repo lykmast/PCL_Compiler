@@ -130,7 +130,6 @@ public:
 	PtrType(Type* t):Type("pointer"),type(t){}
 	PtrType(std::string name,Type* t):Type(name),type(t){}//TODO erase
 	~PtrType(){
-		std::cout<<"PtrType destructor"<<std::endl;
 		if(type)
 			if(type->should_delete())
 				delete type;
@@ -161,9 +160,6 @@ class ArrType: public PtrType{
 public:
 	ArrType(int s,Type* t):PtrType("array",t),size(s){}
 	ArrType(Type* t):PtrType("array",t),size(-1){}
-	~ArrType(){
-		std::cout<<"ArrType destructor"<<std::endl;
-	}
 	virtual Type* clone(){
 		return new ArrType(size,type->clone());
 	}
@@ -413,9 +409,7 @@ class Pconst: public Const {
 public:
 	Pconst():Const(new PtrType(ANY::getInstance())),ptr(nullptr){}//TODO implement for pointers different than nil
 	virtual Const* clone() override{return new Pconst(*this);}
-	~Pconst(){
-		std::cout<<"Pconst destructor does nothing"<<std::endl;
-	}
+
 	Pconst(LValue* pval,Type *t):Const(new PtrType(t) ),ptr(pval){}
 	virtual void printOn(std::ostream &out) const override {
 		out << "Pconst(" << ptr << "of type "<<*type<< ")";
