@@ -440,7 +440,7 @@ inline UnnamedLValue* PtrType::create() const{
 }
 class Arrconst: public Const{
 public:
-	Arrconst(int s, Type* t):Const(t),size(s){}
+	Arrconst(int s, Type* t):Const(new ArrType(s,t)),size(s){}
 	virtual Const* clone() override{return this;}
 	virtual LValue* get_element(int i)=0;
 
