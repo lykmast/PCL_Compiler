@@ -222,6 +222,11 @@ public:
 		std::vector<bool> get_by_ref(){
 			return by_ref;
 		}
+
+
+		std::vector<Type*> get_types(){
+			return formal_types;
+		}
 protected:
 	std::vector<Type*> formal_types;
 	std::vector<bool> by_ref;
@@ -1230,26 +1235,13 @@ public:
 		Type* lType = lvalue->get_type();
 		Type* rType = expr->get_type();
 		if(lType->doCompare(rType)) return;
-		else different_types=true;
-		if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
-			return;
-		if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
-			PtrType* lpType=static_cast<PtrType*>(lType);
-			PtrType* rpType=static_cast<PtrType*>(rType);
-			Type* linType=lpType->get_type();
-			Type* rinType=rpType->get_type();
-			if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
-				ArrType* larrType=static_cast<ArrType*>(linType);
-				ArrType* rarrType=static_cast<ArrType*>(rinType);
-				if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
-					if(larrType->get_type()->doCompare(rarrType->get_type()))
-						return;
-				}
-			}
+
+		different_types=true;
+		if(!typecheck(lType,rType)){
+			/*TODO error type mismatch*/
+			std::cerr<<"ERROR: Type mismatch in let!"<<std::endl;
+			exit(1);
 		}
-		/*TODO error type mismatch*/
-		std::cerr<<"ERROR: Type mismatch in let!"<<std::endl;
-		exit(1);
 	}
 
 	virtual void run() const override{
@@ -1263,7 +1255,29 @@ public:
 			delete c;
 		}
 	}
-private:
+
+	static bool typecheck(Type* lType, Type* rType){
+		if(lType->doCompare(rType)) return true;
+
+		if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
+			return true;
+		if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
+			PtrType* lpType=static_cast<PtrType*>(lType);
+			PtrType* rpType=static_cast<PtrType*>(rType);
+			Type* linType=lpType->get_type();
+			Type* rinType=rpType->get_type();
+			if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
+				ArrType* larrType=static_cast<ArrType*>(linType);
+				ArrType* rarrType=static_cast<ArrType*>(rinType);
+				if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
+					if(larrType->get_type()->doCompare(rarrType->get_type()))
+						return true;
+				}
+			}
+		}
+		return false;
+	}
+protected:
 	LValue  *lvalue;
 	Expr *expr;
 	bool different_types;
@@ -1931,17 +1945,36 @@ protected:
 	Body* body;
 
 	FunctionEntry* check_passing(){
-		std::vector<Type*> types=exprs->get_type();
 		FunctionEntry* e = st.function_lookup(name);
-		e->type->typecheck_args(types);
+		body=e->body;
 		by_ref=e->type->get_by_ref();
-		std::vector<bool> isLValue (exprs->get_isLValue());
-		for(uint i=0; i<by_ref.size(); i++){
-			if(by_ref[i] and not isLValue[i]){
-				std::cerr<<"Argument "<<i<<" is wrong side value."<<std::endl;
+		std::vector<Type*> types=e->type->get_types();
+		for(uint i=0; i<types.size();i++){
+			Expr* expr=(*exprs)[i];
+			expr->sem();
+			if (by_ref[i] and not expr->isLValue()){
+				std::cerr<<"Argument should be an lvalue expression."<<std::endl;
 				exit(1);
 			}
+
+			Type* lType = types[i];
+			Type* rType = expr->get_type();
+
+			if(by_ref[i]){
+				if(Let::typecheck(new PtrType(lType),new PtrType(rType)))
+				continue;
+			}
+			else{
+				if(Let::typecheck(lType, rType))
+				continue;
+			}
+
+			/*TODO error type mismatch*/
+			std::cerr<<"ERROR: Type mismatch in call! ("<<"expected "<<*lType<<" but received "<<*rType<<" instead."<<std::endl;
+			exit(1);
 		}
+
+
 		nesting_diff=st.getNestingOfCurrentScope()-e->nesting;
 		next_fp_offset=st.getSizeOfCurrentScope()+1;
 		return e;
