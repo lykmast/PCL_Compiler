@@ -947,8 +947,10 @@ public:
 			}
 			if(isNumber)
 				ret = new Bconst(li+lr!=ri+rr);
+			else{
+				ret = new Bconst(rptr!=lptr);
+			}
 
-			ret = new Bconst(rptr!=lptr);
 		}
 		else if(!(op.compare("="))) {
 			int li=0,ri=0;
@@ -984,8 +986,9 @@ public:
 			}
 			if(isNumber)
 				ret = new Bconst(li+lr==ri+rr);
-
-			ret = new Bconst(rptr==lptr);
+			else{
+				ret = new Bconst(rptr==lptr);
+			}
 		}
 
 		else if(!(op.compare("<="))) {
