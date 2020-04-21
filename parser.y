@@ -166,7 +166,7 @@ formal:
 ;
 
 block:
-  "begin" mult_stmts "end" {$$=$2; std::cout<<*($2)<<std::endl; /*DEBUG*/}
+  "begin" mult_stmts "end" {$$=$2; }
 ;
 
 mult_stmts:
@@ -215,8 +215,8 @@ r_value:
   T_rconst {$$ = new Rconst($1);}
 | T_iconst {$$ = new Iconst($1);}
 | T_cconst {$$ = new Cconst($1);}
-| "true" {$$ = new Bconst("true");}
-| "false" {$$ = new Bconst("false");}
+| "true" {$$ = new Bconst(true);}
+| "false" {$$ = new Bconst(false);}
 | '(' r_value ')' {$$ = $2;}
 | "nil" {$$ = new Pconst(); /*pointer constant*/}
 | fun_call {$$ = $1;}
