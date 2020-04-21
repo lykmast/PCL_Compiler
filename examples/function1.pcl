@@ -1,0 +1,18 @@
+program function1;
+function f1(x,y : integer; var z:real ):real;
+	var i: integer;
+	var ss: real;
+	begin
+		i:=10;
+		result:=2*(x+y)*i;
+		z:=result/3.3;
+		return;
+		ss:=20000.2;
+	end;
+var i: integer;
+    r:real;
+		x:real;
+	begin
+		i:=0;
+		r:=f1(i+1,i+2,x);
+	end.

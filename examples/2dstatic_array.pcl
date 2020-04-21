@@ -1,0 +1,21 @@
+program test;
+var arr1: array [2] of array [5] of array [3] of integer;
+	x,y,z: integer;
+begin
+	x:=0;
+	while x<2 do
+	begin
+		y:=0;
+		while y<5 do
+		begin
+			z:=0;
+			while z<3 do
+			begin
+				arr1[x][y][z]:=x*5*3+3*y+z;
+				z:=z+1;
+			end;
+			y:=y+1;
+		end;
+		x:=x+1;
+	end;
+end.

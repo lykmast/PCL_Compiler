@@ -1,0 +1,20 @@
+program procedure1;
+procedure p1(x,y : integer; var z:real );
+	var i: integer;
+	var ss: real;
+	begin
+		i:=10;
+		ss:=2*(x+y)*i;
+		z:=ss/3.3;
+		return;
+		ss:=20000.2;
+	end;
+var i: integer;
+    r:real;
+		x:real;
+	begin
+		i:=0;
+		p1(i+1,i+2,x);
+		r:=2.3;
+		x:=x+1;
+	end.

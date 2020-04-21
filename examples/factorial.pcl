@@ -1,0 +1,19 @@
+program factorial;
+	var x: integer;
+	function fact (i: integer) : integer;
+		begin
+			result:=0;
+			if i = 0 then
+			begin
+				result:=1;
+				return;
+			end;
+			if i >= 1 then
+			begin
+				result:=fact(i-1)*i;
+				return;
+			end;
+		end;
+	begin
+			x:=fact(10);
+	end.
