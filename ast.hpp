@@ -592,10 +592,10 @@ private:
 class Sconst: public UnnamedLValue {
 public:
 	Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::getInstance())) {
-		char* str=(char*)(malloc(sizeof(char)*(s.size()-1)));
-		s.substr(1,s.size()-2).copy(str,s.size()-2); //to char[] without quotes
-		str[s.size()-2]='\0';
-		DynamicArray* arr = new DynamicArray(s.size()-1,CHARACTER::getInstance());
+		char* str=(char*)(malloc(sizeof(char)*(s.size()+1)));
+		s.copy(str,s.size()); //to char[]
+		str[s.size()]='\0';
+		DynamicArray* arr = new DynamicArray(s.size()+1,CHARACTER::getInstance());
 		arr->fromString(str);
 		let(arr);
 	}

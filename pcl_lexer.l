@@ -1,5 +1,7 @@
 %option noyywrap
 %x C_COMMENT
+%x STRING
+%x CHARACTER
 %{
 	#include <cstdio>
 	#include <cstdlib>
@@ -9,9 +11,15 @@
 	#include <string>
 %}
 
+
+%{
+	char c;
+	std::string *s;
+	bool added;
+%}
 L [a-zA-Z]
 D [0-9]
-E \\(n|t|r|\'|\"|0|\\)?
+E \\(n|t|r|\'|\"|0|\\)
 W [ \t\r\n]
 %%
 "var" {return T_var;/*'*/}
@@ -49,8 +57,32 @@ W [ \t\r\n]
 {L}(_|{L}|{D})* {std::string *s=new std::string(yytext);yylval.var=s;return T_id;}
 {D}+\.{D}+((e|E)(\-|\+)?{D}+)? {yylval.numd=atof(yytext);return T_rconst;}
 {D}+ {yylval.numi=atoi(yytext);return T_iconst;}
-\"([^\'\\\"]|{E})*\" {std::string* s=new std::string(yytext);yylval.var=s;return T_sconst;/*"*/}
-\'([^\'\\\"]|{E})\'	{yylval.ch=yytext[0];return T_cconst;/*'*/}
+
+\" {BEGIN(STRING); s=new std::string("");/*"*/}
+<STRING>\\n {s->push_back('\n');}
+<STRING>\\t {s->push_back('\t');}
+<STRING>\\r {s->push_back('\r');}
+<STRING>\\0 {s->push_back('\0');}
+<STRING>\\\' {s->push_back('\'');}
+<STRING>\\\" {s->push_back('\"');/*"*/}
+<STRING>\\\\ {s->push_back('\\');}
+<STRING>[^'\"] {s->push_back(yytext[0]);/*'*/}
+<STRING>\n {printf("invalid string\n"); exit(1);}
+<STRING>\" {BEGIN(INITIAL);yylval.var=s; return T_sconst;/*"*/}
+
+
+\' {BEGIN(CHARACTER); added=false;/*'*/}
+<CHARACTER>\\n {if(!added){c='\n'; added=true;}else printf("invalid character\n");}
+<CHARACTER>\\t {if(!added){c='\t'; added=true;}else printf("invalid character\n");}
+<CHARACTER>\\r {if(!added){c='\r'; added=true;}else printf("invalid character\n");}
+<CHARACTER>\\0 {if(!added){c='\0'; added=true;}else printf("invalid character\n");}
+<CHARACTER>\\\' {if(!added){c='\''; added=true;}else printf("invalid character\n");}
+<CHARACTER>\\\" {if(!added){c='\"'; added=true;}else printf("invalid character\n");/*"*/}
+<CHARACTER>\\\\ {if(!added){c='\\'; added=true;}else printf("invalid character\n");}
+<CHARACTER>[^'\"] {if(!added){c=yytext[0]; added=true;}else printf("invalid character\n");/*'*/}
+<CHARACTER>\n {printf("invalid character\n"); exit(1);}
+<CHARACTER>\' {BEGIN(INITIAL);yylval.ch=c; return T_cconst;/*'*/}
+
 ":=" {return T_assign;}
 "<>" {return T_dt;}
 "<=" {return T_lt;}
