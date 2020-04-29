@@ -67,8 +67,8 @@ W [ \t\r\n]
 <STRING>\\\" {s->push_back('\"');/*"*/}
 <STRING>\\\\ {s->push_back('\\');}
 <STRING>[^'\"] {s->push_back(yytext[0]);/*'*/}
-<STRING>\n {printf("invalid string\n"); exit(1);}
 <STRING>\" {BEGIN(INITIAL);yylval.var=s; return T_sconst;/*"*/}
+<STRING>. {printf("invalid string\n"); exit(1);}
 
 
 \' {BEGIN(CHARACTER); added=false;/*'*/}
@@ -80,8 +80,8 @@ W [ \t\r\n]
 <CHARACTER>\\\" {if(!added){c='\"'; added=true;}else printf("invalid character\n");/*"*/}
 <CHARACTER>\\\\ {if(!added){c='\\'; added=true;}else printf("invalid character\n");}
 <CHARACTER>[^'\"] {if(!added){c=yytext[0]; added=true;}else printf("invalid character\n");/*'*/}
-<CHARACTER>\n {printf("invalid character\n"); exit(1);}
 <CHARACTER>\' {BEGIN(INITIAL);yylval.ch=c; return T_cconst;/*'*/}
+<CHARACTER>. {printf("invalid character\n"); exit(1);}
 
 ":=" {return T_assign;}
 "<>" {return T_dt;}
@@ -91,8 +91,8 @@ W [ \t\r\n]
 {W}+  {/* nothing */}
 "(*"            { BEGIN(C_COMMENT); }
 <C_COMMENT>"*)" { BEGIN(INITIAL); }
-<C_COMMENT>.    { }
 <C_COMMENT>\n { }
+<C_COMMENT>.    { }
 . {
 	fprintf(stderr, "Illegal character with code %d\n",yytext[0]);
 	exit(1);

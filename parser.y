@@ -5,7 +5,6 @@
 #include <string>
 #include <vector>
 
-SymbolTable st;
 std::vector<UnnamedLValue*> rt_stack;
 unsigned long fp;
 %}

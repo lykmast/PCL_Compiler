@@ -31,10 +31,13 @@ pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp symbol.hpp
 parser.hpp parser.cpp: parser.y
 	bison -dv -o parser.cpp parser.y
 
-parser.o: parser.cpp pcl_lexer.hpp ast.hpp symbol.hpp
+parser.o: parser.cpp pcl_lexer.hpp ast.hpp ast.cpp symbol.hpp
 
-pcl: pcl_lexer.o parser.o
-	$(CC) $(CFLAGS) -o pcl pcl_lexer.o parser.o
+%.o: %.cpp ast.hpp
+	$(CC) $(CFLAGS) -c -o $@ $<
+
+pcl: pcl_lexer.o parser.o ast.o semantic.o runtime.o types.o
+	$(CC) $(CFLAGS) -o $@ $^
 
 clean:
 	$(RM) pcl_lexer.cpp parser.cpp parser.hpp parser.output *.o

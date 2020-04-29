@@ -5,12 +5,9 @@
 #include <map>
 #include <vector>
 #include <string>
+#include "ast.hpp"
 
 
-// forward declaration of ast class Type
-class Type;
-class CallableType;
-class Body;
 
 struct SymbolEntry {
 	Type* type;
@@ -30,8 +27,9 @@ struct FunctionEntry {
 
 class Scope {
 public:
-	Scope() : locals(), offset(1), size(1), nesting(0) {}
-	Scope(int nest) : locals(), offset(1), size(1), nesting(nest) {}
+	Scope() : locals(), thisFunction(nullptr), offset(1), size(1), nesting(1) {}
+	Scope(int nest, FunctionEntry *e) :
+		locals(), thisFunction(e), offset(1), size(1), nesting(nest) {}
 	int getOffset() const { return offset; }
 	int getNesting() const { return nesting; }
 	int getSize() const { return size; }
@@ -39,7 +37,6 @@ public:
 		if (locals.find(name) == locals.end()) return nullptr;
 		return &(locals[name]);
 	}
-
 	FunctionEntry *function_lookup(std::string name) {
 		if (functions.find(name) == functions.end()) return nullptr;
 		return &(functions[name]);
@@ -62,9 +59,14 @@ public:
 		}
 		functions[name] = FunctionEntry(t, nesting, bod);
 	}
+
+	void add_outer(Type* t){
+		thisFunction->type->add_outer(t);
+	}
 private:
 	std::map<std::string, SymbolEntry> locals;
 	std::map<std::string, FunctionEntry> functions;
+	FunctionEntry* thisFunction;
 	int offset;
 	int size;
 	int nesting;
@@ -73,9 +75,15 @@ private:
 
 class SymbolTable {
 public:
-	void openScope() {
+	void openScope(std::string name) {
 		int nest = scopes.empty() ? 0 : scopes.back().getNesting();
-		scopes.push_back(Scope(nest+1));
+		if (!scopes.empty()){
+			FunctionEntry *e = function_lookup(name);
+			scopes.push_back(Scope(nest+1,e));
+		}
+		else{
+			scopes.push_back(Scope());
+		}
 	}
 	void closeScope() { scopes.pop_back(); };
 	SymbolEntry *lookup(std::string name) {
@@ -109,4 +117,4 @@ private:
 	std::vector<Scope> scopes;
 };
 
-extern SymbolTable st;
+SymbolTable st;
