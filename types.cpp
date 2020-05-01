@@ -1,4 +1,10 @@
+/* ------------------------------------------
+types.cpp
+Contains type classes and related members such
+  as get_type create, doCompare, clone
+------------------------------------------ */
 #include "ast.hpp"
+
 Type::Type(std::string t):name(t){}
 
 std::string Type::get_name(){

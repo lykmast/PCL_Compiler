@@ -9,19 +9,16 @@ Const::~Const(){
 }
 
 
-UnnamedLValue::UnnamedLValue(Type *ty,bool dyn):LValue(dyn),value(nullptr),type(ty){}
-UnnamedLValue::UnnamedLValue(Const* val, Type* ty,bool dyn):LValue(dyn),value(val),type(ty){}
+UnnamedLValue::UnnamedLValue(Type *ty,bool dyn):LValue(dyn),type(ty){}
+UnnamedLValue::UnnamedLValue(value val, Type* ty,bool dyn):LValue(dyn),val(val),type(ty){}
 UnnamedLValue::~UnnamedLValue(){
-	delete value;
 	if(type)
 		if(type->should_delete())
 			delete type;
 }
 void UnnamedLValue::printOn(std::ostream &out) const{
-	if(value)
-		out << "UnnamedLValue(" << *value<<","<<*type << ")";
-	else if(type)
-		out << "UnnamedLValue(EMPTY, "<<*type << ")";
+	if(type)
+		out << "UnnamedLValue(" << val.i<<","<<*type << ")";
 	else
 		out << "UnnamedLValue(EMPTY)";
 }
@@ -60,12 +57,10 @@ StaticArray::StaticArray(int s, Type* t, int o):Arrconst(s,t), offset(o){
 		ArrType* arrT=static_cast<ArrType*>(t);
 		if(arrT->get_size()>0){
 			for(int i=0; i<s; i++){
-				rt_stack[offset+i*child_size]->let(
-					new StaticArray(
-						arrT->get_size(),
-						arrT->get_type(),
-						offset+i*child_size+1
-					)
+				rt_stack[offset+i*child_size]= new StaticArray(
+					arrT->get_size(),
+					arrT->get_type(),
+					offset+i*child_size+1
 				);
 			}
 		}
@@ -103,7 +98,8 @@ DynamicArray::~DynamicArray(){
 }
 void DynamicArray::fromString(char* str){
 	for(int i=0; i<size;i++){
-		arr[i]->let(new Cconst(str[i]));
+		value v; v.c=str[i];
+		arr[i]->let(v);
 	}
 }
 void DynamicArray::printOn(std::ostream &out) const{
@@ -123,7 +119,8 @@ Sconst::Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::ge
 	str[s.size()]='\0';
 	DynamicArray* arr = new DynamicArray(s.size()+1,CHARACTER::getInstance());
 	arr->fromString(str);
-	let(arr);
+	value v; v.lval=arr;
+	let(v);
 }
 
 Bconst::Bconst(bool b):Const(BOOLEAN::getInstance() ),boo(b){}
@@ -165,7 +162,8 @@ void Brackets::printOn(std::ostream &out) const{
 	out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
 }
 
-Let::Let(LValue* lval,Expr* e):lvalue(lval),expr(e),different_types(false){}
+Let::Let(LValue* lval,Expr* e):lvalue(lval),expr(e),different_types(false),
+	is_right_int(false){}
 Let::~Let(){delete lvalue; delete expr;}
 void Let::printOn(std::ostream &out) const {
 	out << "Let(" << *lvalue << ":=" << *expr << ")";

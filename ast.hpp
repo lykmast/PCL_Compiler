@@ -15,8 +15,8 @@ union value{
 	int i;
 	double r;
 	bool b;
-	char* s;
 	LValue* lval;
+	unsigned long uli;
 };
 
 class AST {
@@ -37,7 +37,7 @@ inline std::ostream& operator<< (std::ostream &out, const AST &t) {
 	t.printOn(out);
 	return out;
 }
-class LValue;
+
 class Type: public AST{
 public:
 	Type(std::string t);
@@ -204,7 +204,7 @@ public:
 class Const;
 class Expr: public AST {
 public:
-	virtual Const* eval() = 0;
+	virtual value eval() = 0;
 	virtual Type* get_type()=0;
 	virtual bool isLValue() const{return false;}
 };
@@ -231,9 +231,6 @@ public:
 	Const(Type* ty);
 	~Const();
 	virtual Type* get_type() override;
-	virtual Const* clone()=0;
-	virtual Const* eval() override;
-	virtual value get_value() const;
 	virtual Const* copyToType() const;
 protected:
 	Type* type;
@@ -242,7 +239,7 @@ protected:
 class LValue: public Expr{
 public:
 	LValue(bool dyn=false):dynamic(dyn){}
-	virtual void let(Const* c)=0;
+	virtual void let(value v)=0;
 	virtual UnnamedLValue* getBox()=0;
 	bool isDynamic(){return dynamic;}
 	virtual bool isLValue() const override{return true;}
@@ -253,25 +250,24 @@ protected:
 class UnnamedLValue: public LValue{
 public:
 	UnnamedLValue(Type *ty,bool dyn=false);
-	UnnamedLValue(Const* val, Type* ty,bool dyn=false);
+	UnnamedLValue(value val, Type* ty,bool dyn=false);
 	~UnnamedLValue();
 	virtual void printOn(std::ostream &out) const override;
 
-	virtual void let(Const* c) override;
+	virtual void let(value v) override;
 	virtual UnnamedLValue* getBox() override;
-	virtual Const* eval() override;
+	virtual value eval() override;
 	virtual Type* get_type();
 protected:
-	Const* value;
+	value val;
 	Type* type;
 };
 
 class Rconst: public Const {
 public:
 	Rconst(double n);
-	virtual Const* clone() override;
 	virtual void printOn(std::ostream &out) const override;
-	virtual value get_value() const override;
+	virtual value eval() override;
 private:
 	double num;
 };
@@ -280,9 +276,8 @@ private:
 class Iconst: public Const {
 public:
 	Iconst(int n);
-	virtual Const* clone() override;
 	virtual void printOn(std::ostream &out) const override;
-	virtual value get_value() const override;
+	virtual value eval() override;
 	virtual Const* copyToType() const;
 private:
 	int num;
@@ -291,9 +286,8 @@ private:
 class Cconst: public Const {
 public:
 	Cconst(char c);
-	virtual Const* clone() override;
 	virtual void printOn(std::ostream &out) const override ;
-	virtual value get_value() const override ;
+	virtual value eval() override;
 private:
 	char ch;
 };
@@ -305,9 +299,8 @@ public:
 
 	virtual void printOn(std::ostream &out) const override;
 
-	virtual Const* clone() override;
 
-	virtual value get_value() const override;
+	virtual value eval() override;
 
 	virtual Const* copyToType() const;
 
@@ -315,12 +308,11 @@ protected:
 	LValue* ptr;
 };
 
-class Arrconst: public Const{
+class Arrconst: public UnnamedLValue{
 public:
-	Arrconst(int s, Type* t):Const(new ArrType(s,t)),size(s){}
-	virtual Const* clone() override{return this;}
+	Arrconst(int s, Type* t):UnnamedLValue(new ArrType(s,t)),size(s){}
 	virtual LValue* get_element(int i)=0;
-
+	virtual value eval() override{value v; v.lval=this; return v;};
 protected:
 	int size;
 };
@@ -354,9 +346,9 @@ class Id: public LValue {
 public:
 	Id(std::string v);
 	virtual void printOn(std::ostream &out) const override;
-	virtual Const* eval() override;
+	virtual value eval() override;
 	virtual void sem() override;
-	virtual void let(Const* c) override;
+	virtual void let(value v) override;
 	virtual UnnamedLValue* getBox() override;
 	virtual Type* get_type() override;
 private:
@@ -379,9 +371,8 @@ public:
 class Bconst: public Const {
 public:
 	Bconst(bool b);
-	virtual Const* clone() override;
 	virtual void printOn(std::ostream &out) const override;
-	virtual value get_value() const override ;
+	virtual value eval() override ;
 private:
 	bool boo;
 };
@@ -393,7 +384,7 @@ public:
 	~Op();
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
-	virtual Const* eval() override ;
+	virtual value eval() override ;
 	virtual Type* get_type() override;
 
 private:
@@ -412,7 +403,7 @@ public:
 
 	virtual Type* get_type() override;
 
-	virtual Const* eval() override;
+	virtual value eval() override;
 
 protected:
 	LValue* lvalue;
@@ -423,11 +414,11 @@ public:
 	Dereference(Expr *e);
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
-	virtual Const* eval() override;
+	virtual value eval() override;
 
 	virtual Type* get_type() override;
 
-	virtual void let(Const* c) override;
+	virtual void let(value v) override;
 
 	virtual UnnamedLValue* getBox() override;
 
@@ -441,8 +432,8 @@ public:
 	Brackets(LValue *lval, Expr* e);
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
-	virtual Const* eval() override;
-	virtual void let(Const* c) override;
+	virtual value eval() override;
+	virtual void let(value v) override;
 	virtual UnnamedLValue* getBox() override;
 	virtual Type* get_type() override;
 protected:
@@ -461,10 +452,12 @@ public:
 	virtual void run() const override;
 
 	static bool typecheck(Type* lType, Type* rType);
+	static char parse_as(Type *t);
 protected:
 	LValue  *lvalue;
 	Expr *expr;
 	bool different_types;
+	bool is_right_int;
 };
 
 class If: public Stmt {
@@ -580,7 +573,7 @@ public:
 	ExprList();
 	ExprList(Expr *e);
 	virtual void printOn(std::ostream &out) const override;
-	std::vector<Expr*> eval(std::vector<bool> by_ref);
+	std::vector<value> eval(std::vector<bool> by_ref);
 
 	std::vector<Type*> get_type();
 
@@ -736,7 +729,7 @@ public:
 	virtual void sem() override;
 	virtual Type* get_type() override;
 
-	virtual Const* eval() override;
+	virtual value eval() override;
 	virtual void printOn(std::ostream &out) const override ;
 private:
 	Type* type;

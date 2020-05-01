@@ -161,6 +161,32 @@ void Let::sem(){
 		std::cerr<<"ERROR: Type mismatch in let!"<<std::endl;
 		exit(1);
 	}
+	if(rType->doCompare(INTEGER::getInstance())){
+		is_right_int=true;
+	}
+
+}
+
+bool Let::typecheck(Type* lType, Type* rType){
+	if(lType->doCompare(rType)) return true;
+
+	if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
+		return true;
+	if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
+		PtrType* lpType=static_cast<PtrType*>(lType);
+		PtrType* rpType=static_cast<PtrType*>(rType);
+		Type* linType=lpType->get_type();
+		Type* rinType=rpType->get_type();
+		if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
+			ArrType* larrType=static_cast<ArrType*>(linType);
+			ArrType* rarrType=static_cast<ArrType*>(rinType);
+			if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
+				if(larrType->get_type()->doCompare(rarrType->get_type()))
+					return true;
+			}
+		}
+	}
+	return false;
 }
 
 void If::sem(){
@@ -468,27 +494,4 @@ std::vector<bool> FormalDeclList::get_by_ref(){
 		by_ref.push_back(f->isByRef());
 	}
 	return by_ref;
-}
-
-
-bool Let::typecheck(Type* lType, Type* rType){
-	if(lType->doCompare(rType)) return true;
-
-	if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
-		return true;
-	if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
-		PtrType* lpType=static_cast<PtrType*>(lType);
-		PtrType* rpType=static_cast<PtrType*>(rType);
-		Type* linType=lpType->get_type();
-		Type* rinType=rpType->get_type();
-		if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
-			ArrType* larrType=static_cast<ArrType*>(linType);
-			ArrType* rarrType=static_cast<ArrType*>(rinType);
-			if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
-				if(larrType->get_type()->doCompare(rarrType->get_type()))
-					return true;
-			}
-		}
-	}
-	return false;
 }

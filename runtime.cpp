@@ -1,27 +1,16 @@
 #include "ast.hpp"
-Const* Const::eval(){return this->clone();}
-value Const::get_value() const{value v; v.lval=nullptr; return v;}
 
 UnnamedLValue* UnnamedLValue::getBox(){
 	return this;
 }
-Const* UnnamedLValue::eval(){
-	if(value)
-		return value->eval();
-	else
-		return nullptr;
+value UnnamedLValue::eval(){
+	return val;
 }
-void UnnamedLValue::let(Const* c){
-	if(value)delete value;
-	value=c;
-	if(type)
-		if(type->should_delete())
-			delete type;
-	type=c->get_type();
+void UnnamedLValue::let(value v){
+	val=v;
 }
 
-Const* Rconst::clone() {return new Rconst(*this);}
-value Rconst::get_value() const{
+value Rconst::eval(){
 	value v; v.r=num;
 	return v;
 }
@@ -29,8 +18,7 @@ UnnamedLValue* REAL::create() const{
 	return new UnnamedLValue(REAL::getInstance(),true);
 }
 
-Const* Iconst::clone(){return new Iconst(*this);}
-value Iconst::get_value() const {
+value Iconst::eval() {
 	value v; v.i=num;
 	return v;
 }
@@ -38,8 +26,7 @@ UnnamedLValue* INTEGER::create() const{
 	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
-Const* Cconst::clone() {return new Cconst(*this);}
-value Cconst::get_value() const {
+value Cconst::eval() {
 	value v; v.c=ch;
 	return v;
 }
@@ -47,8 +34,7 @@ UnnamedLValue* CHARACTER::create() const{
 	return new UnnamedLValue(CHARACTER::getInstance(),true);
 }
 
-Const* Pconst::clone() {return new Pconst(*this);}
-value Pconst::get_value() const {
+value Pconst::eval() {
 	value v; v.lval=ptr;
 	return v;
 }
@@ -57,11 +43,10 @@ UnnamedLValue* PtrType::create() const{
 }
 
 UnnamedLValue* ArrType::create() const{
-	return new UnnamedLValue(new DynamicArray(size,type), new ArrType(size,type),true);
+	return new DynamicArray(size,type);
 }
 
-Const* Bconst::clone(){return new Bconst(*this);}
-value Bconst::get_value() const {
+value Bconst::eval() {
 	value v; v.b=boo;
 	return v;
 }
@@ -69,247 +54,209 @@ UnnamedLValue* BOOLEAN::create() const{
 	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
-Const* Id::eval(){
+value Id::eval(){
 	int abs_ofs=find_absolute_offset();
-	Const *c = rt_stack[abs_ofs]->eval();
-	if(!c and !type->get_name().compare("array")){
+	value v = rt_stack[abs_ofs]->eval();
+	if(!v.lval and !type->get_name().compare("array")){
 		ArrType* arrT=static_cast<ArrType*>(type);
 		create_static_array(abs_ofs, arrT);
 		return rt_stack[abs_ofs]->eval();
 	}
-	else return c;
+	else return v;
 }
 void Id::create_static_array(int abs_ofs, ArrType* t){
 	Type* inside_t=t->get_type();
 	int s = t->get_size();
-	Const *c = new StaticArray(s,inside_t,abs_ofs+1);
-	rt_stack[abs_ofs]->let(c);
+		rt_stack[abs_ofs] = new StaticArray(s,inside_t,abs_ofs+1);
 }
-void Id::let(Const* c){
-	rt_stack[find_absolute_offset()]->let(c);
+void Id::let(value v){
+	rt_stack[find_absolute_offset()]->let(v);
 }
 UnnamedLValue* Id::getBox(){
 	return rt_stack[find_absolute_offset()]->getBox();
 }
 
 int Id::find_absolute_offset(){
-	int prev_fp=fp;
+	unsigned long prev_fp=fp;
 	for(int diff=current_nesting-decl_nesting; diff>0; diff--){
-		prev_fp=rt_stack[prev_fp]->eval()->get_value().i;
+		prev_fp=rt_stack[prev_fp]->eval().uli;
 	}
 	return prev_fp+offset;
 }
 
-Const* Op::eval() {
+value Op::eval() {
 	// before the first eval of any op, there must have been one typecheck to
 	// fill resType, leftType, rightType
 	Type* realType=REAL::getInstance();
 	Type* intType=INTEGER::getInstance();
-	Const *leftConst=left->eval();
-	Const *rightConst=nullptr;
-	Const* ret=nullptr;
+	value leftValue=left->eval();
+	value rightValue;
+	value ret;
 	if(right){
-		rightConst=right->eval();
+		rightValue=right->eval();
 	}
 	if(!(op.compare("+")) and right){
 		//BinOp
 		int li=0,ri=0;
 		double lr=0,rr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
 		if(resType->doCompare(realType)){
-			ret = new Rconst(li+ri+lr+rr);
+			ret.r = li+ri+lr+rr;
 		}
 		else{
-			ret = new Iconst(li+ri);
+			ret.i = li+ri;
 		}
 	}
 	else if(!(op.compare("+"))){
 		//UnOp
 		int li=0;
 		double lr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(resType->doCompare(realType)){
-			ret = new Rconst(li+lr);
+			ret.r=li+lr;
 		}
 		else{
-			ret = new Iconst(li);
+			ret.i=li;
 		}
 	}
 	else if(!(op.compare("-")) and right) {
 	//BinOp
 		int li=0,ri=0;
 		double lr=0,rr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
 		if(resType->doCompare(realType)){
-			ret = new Rconst(li-ri+lr-rr);
+			ret.r =li-ri+lr-rr;
 		}
 		else{
-			ret = new Iconst(li-ri);
+			ret.i = li-ri;
 		}
 	}
 	else if(!(op.compare("-"))){
 		//UnOp
 		int li=0;
 		double lr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(resType->doCompare(realType)){
-			ret = new Rconst(-li-lr);
+			ret.r = -li-lr;
 		}
 		else{
-			ret = new Iconst(-li);
+			ret.i = -li;
 		}
 	}
 	else if(!(op.compare("*"))) {
 	//BinOp
 		int li=1,ri=1;
 		double lr=1,rr=1;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
 		if(resType->doCompare(realType)){
-			ret = new Rconst(li*ri*lr*rr);
+			ret.r = li*ri*lr*rr;
 		}
 		else{
-			ret = new Iconst(li*ri);
+			ret.i = li*ri;
 		}
 	}
 	else if(!(op.compare("/"))){
 		int li=1,ri=1;
 		double lr=1,rr=1;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
 		if(resType->doCompare(realType)){
-			ret = new Rconst((li/rr)*(lr/ri));
+			ret.r = (li/rr)*(lr/ri);
 		}
 	}
 
 	if( !(op.compare("div"))){
-		value v=leftConst->get_value();
-		int li=v.i;
-		v=rightConst->get_value();
-		int ri=v.i;
-		ret = new Iconst(li/ri);
+		int li=leftValue.i;
+		int ri=rightValue.i;
+		ret.i = li/ri;
 	}
 	else if(!(op.compare("mod"))) {
-		value v=leftConst->get_value();
-		int li=v.i;
-		v=rightConst->get_value();
-		int ri=v.i;
-		ret = new Iconst(li%ri);
+		int li=leftValue.i;
+		int ri=rightValue.i;
+		ret.i = li%ri;
 	}
 	else if(!(op.compare("<>"))) {
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		LValue* lptr, *rptr;
 		bool isNumber=true;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else if(leftType->doCompare(intType)){
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		else{
-			v=leftConst->get_value();
-			lptr=v.lval;
+			lptr=leftValue.lval;
 			isNumber=false;
 		}
 
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else if(rightType->doCompare(intType)) {
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
 		else{
-			v=rightConst->get_value();
-			rptr=v.lval;
+			rptr=rightValue.lval;
 		}
 		if(isNumber)
-			ret = new Bconst(li+lr!=ri+rr);
+			ret.b = li+lr!=ri+rr;
 		else{
-			ret = new Bconst(rptr!=lptr);
+			ret.b = rptr!=lptr;
 		}
 
 	}
@@ -318,189 +265,152 @@ Const* Op::eval() {
 		double lr=0,rr=0;
 		LValue* lptr, *rptr;
 		bool isNumber=true;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else if(leftType->doCompare(intType)){
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		else{
-			v=leftConst->get_value();
-			lptr=v.lval;
+			lptr=leftValue.lval;
 			isNumber=false;
 		}
 
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else if(rightType->doCompare(intType)) {
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
 		else{
-			v=rightConst->get_value();
-			rptr=v.lval;
+			rptr=rightValue.lval;
 		}
 		if(isNumber)
-			ret = new Bconst(li+lr==ri+rr);
+			ret.b = li+lr==ri+rr;
 		else{
-			ret = new Bconst(rptr==lptr);
+			ret.b = rptr==lptr;
 		}
 	}
 
 	else if(!(op.compare("<="))) {
 		int li=0,ri=0;
 		double lr=0,rr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
-		ret = new Bconst(li+lr<=ri+rr);
+		ret.b = li+lr<=ri+rr;
 	}
 	else if(!(op.compare(">="))) {
 		int li=0,ri=0;
 		double lr=0,rr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
-		ret = new Bconst(li+lr>=ri+rr);
+		ret.b = li+lr>=ri+rr;
 	}
 	else if(!(op.compare(">"))) {
 		int li=0,ri=0;
 		double lr=0,rr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
-		ret = new Bconst(li+lr > ri+rr);
+		ret.b = li+lr > ri+rr;
 	}
 	else if(!(op.compare("<"))) {
 		int li=0,ri=0;
 		double lr=0,rr=0;
-		value v;
 		if(leftType->doCompare(realType)){
-			v=leftConst->get_value();
-			lr=v.r;
+			lr=leftValue.r;
 		}
 		else{
-			v=leftConst->get_value();
-			li=v.i;
+			li=leftValue.i;
 		}
 		if(rightType->doCompare(realType)){
-			v=rightConst->get_value();
-			rr=v.r;
+			rr=rightValue.r;
 		}
 		else{
-			v=rightConst->get_value();
-			ri=v.i;
+			ri=rightValue.i;
 		}
-		ret = new Bconst(li+lr < ri+rr);
+		ret.b = li+lr < ri+rr;
 	}
 	else if(!(op.compare("and"))) {
-		value v=leftConst->get_value();
-		bool lb=v.b;
-		v=rightConst->get_value();
-		bool rb=v.b;
-		ret = new Bconst(lb and rb);
+		bool lb=leftValue.b;
+		bool rb=rightValue.b;
+		ret.b = lb and rb;
 	}
 	else if(!(op.compare("or"))) {
-		value v=leftConst->get_value();
-		bool lb=v.b;
-		v=rightConst->get_value();
-		bool rb=v.b;
-		ret = new Bconst(lb or rb);
+		bool lb=leftValue.b;
+		bool rb=rightValue.b;
+		ret.b = lb or rb;
 	}
 	else if(!(op.compare("not"))) {
 		//UnOp
 
-		value v;
-		v=leftConst->get_value();
-		bool lb=v.b;
-		ret = new Bconst(not lb);
+		bool lb=leftValue.b;
+		ret.b = not lb;
 	}
-	delete leftConst;
-	if(right) delete rightConst;
 	return ret;
 }
 
-Const* Reference::eval(){
-	return new Pconst(lvalue,lvalue->get_type());
+value Reference::eval(){
+	value v; v.lval=lvalue;
+	return v;
 }
 
-Const* Dereference::eval(){
-	Const* c = expr->eval();
-	value v = c->get_value();
+value Dereference::eval(){
+	value v = expr->eval();
 	return (v.lval)->eval();
 }
-void Dereference::let(Const* c){
-	Const* con = expr->eval();
-	value v = con->get_value();
-	(v.lval)->let(c);
+void Dereference::let(value v){
+	value vlval = expr->eval();
+	(vlval.lval)->let(v);
 }
 UnnamedLValue* Dereference::getBox(){
-	Const* con = expr->eval();
-	value v = con->get_value();
+	value v = expr->eval();
 	return (v.lval)->getBox();
 }
 
-Const* Brackets::eval(){
+value Brackets::eval(){
 	return element()->eval();
 }
-void Brackets::let(Const* c){
-	element()->let(c);
+void Brackets::let(value v){
+	element()->let(v);
 }
 UnnamedLValue* Brackets::getBox(){
 	return element()->getBox();
 }
 LValue* Brackets::element(){
-	value v = expr->eval()->get_value();
+	value v = expr->eval();
 	int i = v.i;
-	Const* c = lvalue->eval();
-	Arrconst *arr = static_cast<Arrconst*>(c);
+	v = lvalue->eval();
+	Arrconst *arr = static_cast<Arrconst*>(v.lval);
 	return arr->get_element(i);
 }
 
@@ -513,41 +423,33 @@ LValue* DynamicArray::get_element(int i){
 
 
 void Let::run() const{
-	Const* c = expr->eval();
-	if(!different_types){
-		lvalue->let(c);
+	value v = expr->eval();
+	if(different_types and is_right_int){
+		v.r=v.i;
 	}
-	else{
-		Const* n=c->copyToType();
-		lvalue->let(n);
-		delete c;
-	}
+	lvalue->let(v);
 }
 
 void If::run() const{
-	Const * c= expr->eval();
-	value v=c->get_value();
+	value v=expr->eval();
 	bool e = v.b;
 	if(e) stmt1->run();
 	else if (stmt2) stmt2->run();
 }
 
 void While::run() const{
-	Const * c= expr->eval();
-	value v=c->get_value();
+	value v=expr->eval();
 	bool e = v.b;
 	while(e) {
 		stmt->run();
-		c= expr->eval();
-		value v=c->get_value();
+		v=expr->eval();
 		e = v.b;
 	}
 }
 
 void New::run() const{
 	if(expr){
-		Const* c= expr->eval();
-		value v = c->get_value();
+		value v = expr->eval();
 		int i = v.i;
 		if(i<=0) {
 			/*TODO ERROR wrong value*/
@@ -561,21 +463,20 @@ void New::run() const{
 		Type* t=p->get_type();
 		ArrType* arrT = static_cast<ArrType*>(t);
 		ArrType* arrT_size = new ArrType(i,arrT->get_type());
-		Pconst *ret = new Pconst(arrT_size->create(), arrT_size );
-		lvalue->let(ret);
+		value vlval; vlval.lval = arrT_size->create();
+		lvalue->let(vlval);
 	}
 	else{
 		Type* idType=lvalue->get_type();
 		PtrType* p=static_cast<PtrType*>(idType);
 		Type* t=p->get_type();
-		Pconst *ret = new Pconst(t->create(), t);
-		lvalue->let(ret);
+		value vlval; vlval.lval = t->create();
+		lvalue->let(vlval);
 	}
 }
 
 void Dispose::run() const{
-	Const *c = lvalue->eval();
-	value v = c->get_value();
+	value v = lvalue->eval();
 	LValue* ptr = v.lval;
 	if(!(ptr->isDynamic())){
 		/*TODO ERROR non dynamic pointer (RUNTIME)*/
@@ -585,12 +486,12 @@ void Dispose::run() const{
 		exit(1);
 	}
 	delete ptr;
-	lvalue->let(new Pconst());
+	v.lval=nullptr;
+	lvalue->let(v);
 }
 
 void DisposeArr::run() const{
-	Const *c = lvalue->eval();
-	value v = c->get_value();
+	value v = lvalue->eval();
 	LValue* ptr = v.lval;
 	if(!(ptr->isDynamic())){
 		/*TODO ERROR non dynamic pointer (RUNTIME)*/
@@ -600,7 +501,8 @@ void DisposeArr::run() const{
 		exit(1);
 	}
 	delete ptr;
-	lvalue->let(new Pconst());
+	v.lval=nullptr;
+	lvalue->let(v);
 }
 
 void StmtList::run() const{
@@ -612,11 +514,11 @@ void StmtList::run() const{
 }
 
 
-std::vector<Expr*> ExprList::eval(std::vector<bool> by_ref){
-	std::vector<Expr*> ret(list.size());
+std::vector<value> ExprList::eval(std::vector<bool> by_ref){
+	std::vector<value> ret(list.size());
 	for(uint i=0; i<list.size(); i++){
 		if(by_ref[i]){
-			ret[i]=list[i];
+			ret[i].lval=static_cast<LValue*>(list[i]);
 		}
 		else{
 			ret[i]=list[i]->eval();
@@ -643,10 +545,12 @@ void Body::run() const{
 }
 
 void Program::run(){
-	rt_stack.push_back(new UnnamedLValue(new Iconst(0),INTEGER::getInstance()));
+	value v; v.uli=0;
+	rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance()));
 	fp=0;
 	for(int i=0; i<body->get_size()-1; i++){
-		rt_stack.push_back(new UnnamedLValue(nullptr));
+		value v; v.lval=nullptr;
+		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
 	body->run();
 	for(int i=0; i<body->get_size(); i++){
@@ -660,49 +564,54 @@ int Body::get_size(){
 }
 
 void Call::before_run(bool isFunction) const{
-	int next_fp=fp+next_fp_offset;
+	unsigned long next_fp=fp+next_fp_offset;
 	// push current fp at next_fp-1 offset in stack
-	rt_stack.push_back(new UnnamedLValue(new Iconst(fp),INTEGER::getInstance())); //next_fp-1
+	value v; v.uli=fp;
+	rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance())); //next_fp-1
 	// push access link at next_fp offset in stack
 	if(nesting_diff<0){
-		rt_stack.push_back(new UnnamedLValue(new Iconst(fp),INTEGER::getInstance())); //next_fp
+		rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance())); //next_fp
 	}
 	else{
-		int prev_fp=fp;
+		unsigned long prev_fp=fp;
 		for(int diff=nesting_diff; diff>0; diff--){
-			prev_fp=rt_stack[prev_fp]->eval()->get_value().i;
+			prev_fp=rt_stack[prev_fp]->eval().uli;
 		}
-		Const* c=rt_stack[prev_fp]->eval();
-		rt_stack.push_back(new UnnamedLValue(c,INTEGER::getInstance())); //next_fp
+		value v=rt_stack[prev_fp]->eval();
+		rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance())); //next_fp
 
 	}
 	if(isFunction){
 		// push one more value for function result at next_fp+1 offset
-		rt_stack.push_back(new UnnamedLValue(nullptr));
+		value v; v.lval=nullptr;
+		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
 	// push arguments in stack (lvalues for references)
-	std::vector<Expr*> args(exprs->eval(by_ref));
+	std::vector<value> args(exprs->eval(by_ref));
 	for(uint i=0; i<args.size(); i++){
 		if(by_ref[i]){
-			rt_stack.push_back(static_cast<LValue*>(args[i])->getBox());
+			rt_stack.push_back(static_cast<LValue*>(args[i].lval)->getBox());
 		}
 		else{
-			rt_stack.push_back(new UnnamedLValue(static_cast<Const*>(args[i]),args[i]->get_type()));
+			rt_stack.push_back(new UnnamedLValue(args[i],ANY::getInstance()));
 		}
 	}
 	// push empty spaces for callee locals (body size-arguments that are already pushed)
 	int size=body->get_size()-exprs->size()-1;
 	if(isFunction)
 		size-=1;
-	for (int i = 0; i < size; ++i) rt_stack.push_back(new UnnamedLValue(nullptr));
+	for (int i = 0; i < size; ++i){
+		value v; v.lval=nullptr;
+		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
+	}
 	// set fp to next
 	fp=next_fp;
 }
 
 void Call::after_run(bool isFunction) const{
 	// restore old fp (stack[next_fp-1])
-	int next_fp=fp;
-	fp=rt_stack[next_fp-1]->eval()->get_value().i;
+	unsigned long next_fp=fp;
+	fp=rt_stack[next_fp-1]->eval().uli;
 	// pop locals and arguments from stack
 	int size=body->get_size()-exprs->size()-1;
 	if(isFunction)
@@ -735,11 +644,11 @@ void ProcCall::run() const{
 	after_run();
 }
 
-Const* FunctionCall::eval(){
+value FunctionCall::eval(){
 	before_run(true); // flag for function
 	body->run();
 	// take function result from stack[fp+1]
-	Const* res = rt_stack[fp+1]->eval();
+	value res = rt_stack[fp+1]->eval();
 	after_run(true);
 	return res;
 }
