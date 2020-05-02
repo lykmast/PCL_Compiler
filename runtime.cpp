@@ -600,6 +600,9 @@ int Body::get_size(){
 }
 
 void Call::before_run(bool isFunction) const{
+	// first evaluate arguments
+	std::vector<value> args(exprs->eval(by_ref));
+	// then start pushing things in the stack
 	unsigned long next_fp=fp+next_fp_offset;
 	// push current fp at next_fp-1 offset in stack
 	value v; v.uli=fp;
@@ -623,7 +626,6 @@ void Call::before_run(bool isFunction) const{
 		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
 	// push arguments in stack (lvalues for references)
-	std::vector<value> args(exprs->eval(by_ref));
 	for(uint i=0; i<args.size(); i++){
 		if(by_ref[i]){
 			rt_stack.push_back(args[i].lval->getBox());
