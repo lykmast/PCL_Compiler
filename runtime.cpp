@@ -224,7 +224,7 @@ value Op::eval() {
 		}
 	}
 
-	if( !(op.compare("div"))){
+	else if( !(op.compare("div"))){
 		int li=leftValue.i;
 		int ri=rightValue.i;
 		ret.i = li/ri;
@@ -238,31 +238,46 @@ value Op::eval() {
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		LValue* lptr, *rptr;
-		bool isNumber=true;
+		char type='n';
 		if(leftType->doCompare(realType)){
 			lr=leftValue.r;
 		}
 		else if(leftType->doCompare(intType)){
 			li=leftValue.i;
 		}
+		else if (leftType->doCompare(CHARACTER::getInstance())){
+			li=leftValue.c;
+			type='c';
+		}
+		else if (leftType->doCompare(BOOLEAN::getInstance())){
+			li=leftValue.b;
+			type='b';
+		}
 		else{
 			lptr=leftValue.lval;
-			isNumber=false;
+			type='l';
 		}
-
 		if(rightType->doCompare(realType)){
 			rr=rightValue.r;
 		}
-		else if(rightType->doCompare(intType)) {
-			ri=rightValue.i;
+		else if (rightType->doCompare(CHARACTER::getInstance())){
+			ri=rightValue.c;
+		}
+		else if (rightType->doCompare(BOOLEAN::getInstance())){
+			ri=rightValue.b;
 		}
 		else{
 			rptr=rightValue.lval;
 		}
-		if(isNumber)
-			ret.b = li+lr!=ri+rr;
-		else{
-			ret.b = rptr!=lptr;
+		switch (type) {
+			case 'n':
+				ret.b = li+lr!=ri+rr;
+				break;
+			case 'c': case 'b':
+				ret.b= li!=ri;
+				break;
+			default:
+				ret.b = rptr!=lptr;
 		}
 
 	}
@@ -270,31 +285,46 @@ value Op::eval() {
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		LValue* lptr, *rptr;
-		bool isNumber=true;
+		char type='n';
 		if(leftType->doCompare(realType)){
 			lr=leftValue.r;
 		}
 		else if(leftType->doCompare(intType)){
 			li=leftValue.i;
 		}
+		else if (leftType->doCompare(CHARACTER::getInstance())){
+			li=leftValue.c;
+			type='c';
+		}
+		else if (leftType->doCompare(BOOLEAN::getInstance())){
+			li=leftValue.b;
+			type='b';
+		}
 		else{
 			lptr=leftValue.lval;
-			isNumber=false;
+			type='l';
 		}
-
 		if(rightType->doCompare(realType)){
 			rr=rightValue.r;
 		}
-		else if(rightType->doCompare(intType)) {
-			ri=rightValue.i;
+		else if (rightType->doCompare(CHARACTER::getInstance())){
+			ri=rightValue.c;
+		}
+		else if (rightType->doCompare(BOOLEAN::getInstance())){
+			ri=rightValue.b;
 		}
 		else{
 			rptr=rightValue.lval;
 		}
-		if(isNumber)
-			ret.b = li+lr==ri+rr;
-		else{
-			ret.b = rptr==lptr;
+		switch (type) {
+			case 'n':
+				ret.b = li+lr==ri+rr;
+				break;
+			case 'c': case 'b':
+				ret.b= li==rr;
+				break;
+			default:
+				ret.b = rptr==lptr;
 		}
 	}
 
