@@ -51,7 +51,7 @@ value Bconst::eval() {
 	return v;
 }
 UnnamedLValue* BOOLEAN::create() const{
-	return new UnnamedLValue(INTEGER::getInstance(),true);
+	return new UnnamedLValue(BOOLEAN::getInstance(),true);
 }
 
 value Id::eval(){
