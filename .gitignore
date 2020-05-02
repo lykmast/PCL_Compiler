@@ -9,3 +9,5 @@ pcl_lexer.cpp
 *.output
 parser.hpp
 *.cson
+*.gdb
+*.inp
