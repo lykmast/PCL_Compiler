@@ -73,7 +73,13 @@ void Id::let(value v){
 	rt_stack[find_absolute_offset()]->let(v);
 }
 UnnamedLValue* Id::getBox(){
-	return rt_stack[find_absolute_offset()]->getBox();
+	int abs_ofs=find_absolute_offset();
+	value v = rt_stack[abs_ofs]->eval();
+	if(!v.lval and !type->get_name().compare("array")){
+		ArrType* arrT=static_cast<ArrType*>(type);
+		create_static_array(abs_ofs, arrT);
+	}
+	return rt_stack[abs_ofs]->getBox();
 }
 
 int Id::find_absolute_offset(){
