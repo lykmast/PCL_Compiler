@@ -626,7 +626,7 @@ void Call::before_run(bool isFunction) const{
 	std::vector<value> args(exprs->eval(by_ref));
 	for(uint i=0; i<args.size(); i++){
 		if(by_ref[i]){
-			rt_stack.push_back(static_cast<LValue*>(args[i].lval)->getBox());
+			rt_stack.push_back(args[i].lval->getBox());
 		}
 		else{
 			rt_stack.push_back(new UnnamedLValue(args[i],ANY::getInstance()));
