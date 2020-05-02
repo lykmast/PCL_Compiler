@@ -22,7 +22,7 @@ union value{
 class AST {
 public:
 	virtual ~AST() {}
-	virtual void printOn(std::ostream &out) const = 0;
+	virtual void printOn(std::ostream &out) const {out<<"";}
 	virtual void sem(){}
 };
 
@@ -310,9 +310,10 @@ protected:
 
 class Arrconst: public UnnamedLValue{
 public:
-	Arrconst(int s, Type* t):UnnamedLValue(new ArrType(s,t)),size(s){}
+	Arrconst(int s, Type* t):UnnamedLValue(new ArrType(s,t)),size(s){
+		val.lval=this;
+	}
 	virtual LValue* get_element(int i)=0;
-	virtual value eval() override{value v; v.lval=this; return v;};
 protected:
 	int size;
 };
@@ -333,9 +334,9 @@ private:
 class DynamicArray: public Arrconst{
 public:
 	DynamicArray(int s, Type* t);
+	DynamicArray(std::string s);
 	~DynamicArray();
 	virtual LValue* get_element(int i) override;
-	void fromString(char* str);
 	virtual void printOn(std::ostream &out) const override;
 protected:
 	std::vector<UnnamedLValue*> arr;
@@ -363,10 +364,7 @@ private:
 	int find_absolute_offset();
 
 };
-class Sconst: public UnnamedLValue {
-public:
-	Sconst(std::string s);
-};
+
 
 class Bconst: public Const {
 public:
@@ -666,10 +664,11 @@ protected:
 
 class Procedure:public Decl{
 public:
-	Procedure(std::string name, DeclList *decl_list, Body* bod, std::string decl_type="procedure");
-		virtual void printOn(std::ostream &out) const override;
-		void add_body(Body* bod);
-		virtual void sem() override;
+	Procedure(std::string name, DeclList *decl_list,
+		Body* bod, std::string decl_type="procedure");
+	virtual void printOn(std::ostream &out) const override;
+	void add_body(Body* bod);
+	virtual void sem() override;
 protected:
 	Body* body;
 	FormalDeclList* formals;
@@ -677,7 +676,8 @@ protected:
 
 class Function:public Procedure{
 public:
-	Function(std::string name, DeclList *decl_list, Type* return_type, Body* bod);
+	Function(std::string name, DeclList *decl_list,
+		Type* return_type, Body* bod);
 	virtual void sem() override;
 protected:
 	Type* ret_type;

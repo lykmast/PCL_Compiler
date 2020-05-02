@@ -1,6 +1,5 @@
 #include "ast.hpp"
 
-
 Const::Const(Type* ty):type(ty){}
 Const::~Const(){
 	if(type)
@@ -18,7 +17,7 @@ UnnamedLValue::~UnnamedLValue(){
 }
 void UnnamedLValue::printOn(std::ostream &out) const{
 	if(type)
-		out << "UnnamedLValue(" << val.i<<","<<*type << ")";
+		out << "UnnamedLValue(" << val.lval<<","<<*type << ")";
 	else
 		out << "UnnamedLValue(EMPTY)";
 }
@@ -96,7 +95,15 @@ DynamicArray::~DynamicArray(){
 	for (auto p:arr)
 		delete p;
 }
-void DynamicArray::fromString(char* str){
+DynamicArray::DynamicArray(std::string s):
+		Arrconst(s.size()+1,CHARACTER::getInstance()) {
+	char* str=(char*)(malloc(sizeof(char)*(s.size()+1)));
+	s.copy(str,s.size()); //to char[]
+	str[s.size()]='\0';
+	arr.resize(s.size()+1);
+	for(uint i=0;i<s.size()+1;i++){
+		arr[i]=CHARACTER::getInstance()->create();
+	}
 	for(int i=0; i<size;i++){
 		value v; v.c=str[i];
 		arr[i]->let(v);
@@ -113,15 +120,6 @@ void Id::printOn(std::ostream &out) const {
 }
 
 
-Sconst::Sconst(std::string s):UnnamedLValue(new ArrType(s.size()-1,CHARACTER::getInstance())) {
-	char* str=(char*)(malloc(sizeof(char)*(s.size()+1)));
-	s.copy(str,s.size()); //to char[]
-	str[s.size()]='\0';
-	DynamicArray* arr = new DynamicArray(s.size()+1,CHARACTER::getInstance());
-	arr->fromString(str);
-	value v; v.lval=arr;
-	let(v);
-}
 
 Bconst::Bconst(bool b):Const(BOOLEAN::getInstance() ),boo(b){}
 
