@@ -95,8 +95,11 @@ unsigned long fp;
 program:
   "program" T_id ';' body '.'
   		{$$=new Program(*$2,$4);
-	    std::cout<<"before sem: "<<*$$<<std::endl; $$->sem();
-       std::cout<<"after sem: "<<*$$<<std::endl; $$->run();}
+	    $$->sem();
+	     /* std::cout<<"before sem: "<<*$$<<std::endl;
+	    std::cout<<"after sem: "<<*$$<<std::endl;
+	    // fflush(stdin); */
+	    $$->run();}
 ;
 
 // {std::cout << "AST: " << *$4 << std::endl; $$ = new Program($4);std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();
@@ -264,6 +267,6 @@ mult_exprs:
 
 int main() {
   int result = yyparse();
-  if (result == 0) printf("Success.\n");
+  if (result == 0) fprintf(stderr,"Success.\n");
   return result;
 }

@@ -577,7 +577,7 @@ inline void print_stack(){
 
 void Body::run() const{
 	statements->run();
-	print_stack();
+	// print_stack();
 }
 
 void Program::run(){
