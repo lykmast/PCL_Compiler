@@ -1,0 +1,8 @@
+program writes;
+begin
+	writeInteger(123);
+	writeBoolean(false);
+	writeChar('b');
+	writeReal(3.14);
+	writeString("hello world!\n");
+end.

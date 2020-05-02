@@ -1,0 +1,20 @@
+program reads;
+ var
+	 i: integer;
+	 r: real;
+	 c: char;
+	 b: boolean;
+	 s: array [10] of char;
+begin
+	i:=readInteger();
+	writeInteger(i+1);
+	r:=readReal();
+	writeReal(r+0.5);
+	c:=readChar();
+	writeChar(c);
+	b:=readBoolean();
+	writeBoolean(not b);
+	readString(10,s);
+	writeString(s);
+	writeChar('\n');
+end.

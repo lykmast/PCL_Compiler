@@ -1,0 +1,66 @@
+program qsort;
+	procedure QuickSort (var arr : array of integer; low, high: integer);
+		procedure swap (var x, y : integer);
+			var t : integer;
+			begin
+				t := x;
+				x := y;
+				y := t
+			end;(* end procedure swap*)
+		function partition (var arr: array of integer; low, high: integer): integer;
+			var pivot, i, j: integer;
+			begin
+				pivot:=arr[high];
+				i:=low-1;
+				j:=low;
+				while j<=high-1 do (*for (int j = low; j <= high- 1;*)
+					begin
+						if arr[j]<=pivot then
+						begin
+							i:=i+1;
+							swap(arr[i],arr[j]);
+						end;
+						j:=j+1; (* j++)*)
+					end;
+				swap(arr[i+1],arr[high]);
+				result:=i+1;
+			end;(* end function partion*)
+
+		var pi: integer;
+		begin
+			if low < high then
+			begin
+				pi:=partition(arr, low, high);
+				QuickSort(arr, low, pi-1);
+				QuickSort(arr, pi+1, high);
+			end;
+		end;(* end procedure QuickSort *)
+	procedure PrintArray (var msg : array of char;
+	var x: array of integer; n: integer);
+		var i : integer;
+		begin
+			writeString(msg);
+			i := 0;
+			while i < n do
+			begin
+				if i > 0 then
+					writeString(", ");
+				writeInteger(x[i]);
+				i := i+1
+			end;
+			writeString("\n");
+		end;(* end procedure PrintArray *)
+	var i: integer; x: array [16] of integer; seed : integer;
+	begin
+		i := 0;
+		seed := 65;
+		while i < 16 do
+		begin
+			seed := (seed * 137 + 221 + i) mod 101;
+			x[i] := seed;
+			i := i + 1
+		end;
+		PrintArray("Initial array: ", x, 16);
+		QuickSort(x, 0, 15);
+		PrintArray("Sorted array: ", x, 16)
+	end.

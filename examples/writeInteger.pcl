@@ -1,0 +1,4 @@
+program writeInteger;
+begin
+	writeInteger(1231231);
+end.

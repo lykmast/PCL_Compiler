@@ -26,7 +26,7 @@ program bsort;
 				end
 			end
 		end;
-	(*procedure PrintArray (var msg : array of char;
+	procedure PrintArray (var msg : array of char;
 	var x: array of integer; n: integer);
 		var i : integer;
 		begin
@@ -40,7 +40,7 @@ program bsort;
 				i := i+1
 			end;
 			writeString("\n");
-		end;*)
+		end;
 	var i: integer; x: array [16] of integer; seed : integer;
 	begin
 		i := 0;
@@ -51,7 +51,7 @@ program bsort;
 			x[i] := seed;
 			i := i + 1
 		end;
-		(*PrintArray("Initial array: ", x, 16);*)
+		PrintArray("Initial array: ", x, 16);
 		BubbleSort(x, 16);
-		(*PrintArray("Sorted array: ", x, 16)*)
+		PrintArray("Sorted array: ", x, 16)
 	end.

@@ -18,6 +18,6 @@ program reverse;
 			r[i] := '\0'
 		end;
 	begin
-			reverse("\n!dlrow olleH");
-			(*writeString(r)*)
+		reverse("\n!dlrow olleH");
+		writeString(r)
 	end.
