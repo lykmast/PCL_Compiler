@@ -36,7 +36,7 @@ parser.o: parser.cpp pcl_lexer.hpp ast.hpp ast.cpp symbol.hpp
 %.o: %.cpp ast.hpp
 	$(CC) $(CFLAGS) -c -o $@ $<
 
-pcl: pcl_lexer.o parser.o ast.o semantic.o runtime.o types.o
+pcl: pcl_lexer.o parser.o ast.o semantic.o runtime.o types.o library.o
 	$(CC) $(CFLAGS) -o $@ $^
 
 clean:

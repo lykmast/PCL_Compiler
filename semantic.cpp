@@ -1,5 +1,7 @@
 #include "ast.hpp"
 #include "symbol.hpp"
+#include "library.hpp"
+
 void Id::sem(){
 	SymbolEntry *e = st.lookup(name);
 	if(!e){
@@ -409,9 +411,13 @@ void Function::sem(){
 
 void Program::sem(){
 	st.openScope(name);
+	for(auto p:library_subprograms){
+		p->sem();
+	}
 	body->sem();
 	size=st.getSizeOfCurrentScope();
 	st.closeScope();
+	inp=fopen("pascal_input.inp", "r");
 }
 
 void ProcCall::sem(){
