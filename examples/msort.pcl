@@ -1,0 +1,75 @@
+program msort;
+	procedure PrintArray (var msg : array of char;
+		var x: array of integer; l,r: integer);
+		var i : integer;
+		begin
+			writeString(msg);
+			i := l;
+			while i <= r do
+			begin
+				if i > 0 then
+					writeString(", ");
+					writeInteger(x[i]);
+					i := i+1
+			end;
+			writeString("\n");
+		end;(* end procedure PrintArray *)
+	procedure MergeSort (var arr : array of integer; l, r: integer);
+		procedure swap (var x, y : integer);
+			var t : integer;
+			begin
+				t := x;
+				x := y;
+				y := t
+			end;(* end procedure swap*)
+		procedure merge(var arr: array of integer; start_, mid_, end_:integer);
+			var start2_, value_, index_: integer;
+			begin
+				start2_:= mid_+1;
+				if arr[mid_] <= arr[start2_] then
+					return;
+
+				while (start_<= mid_) and (start2_<=end_) do
+				begin
+					if arr[start_]<= arr[start2_] then
+						start_:=start_+1
+					else
+					begin
+						value_:= arr[start2_];
+						index_:= start2_;
+						while index_ <> start_ do
+						begin
+							arr[index_]:=arr[index_ - 1];
+							index_:= index_-1;
+						end;
+						arr[start_] := value_;
+						start_:=start_+1;
+						mid_:=mid_+1;
+						start2_:=start2_+1;
+					end; (* end else*)
+				end; (* end while start_ *)
+			end; (* end procedure merge *)
+		var m: integer;
+		begin
+			if l < r then
+			begin
+				m:= (l+r) div 2;
+				MergeSort(arr, l, m);
+				MergeSort(arr, m+1, r);
+				merge(arr, l, m, r);
+			end;
+		end;(* end procedure QuickSort *)
+	var i: integer; x: array [16] of integer; seed : integer;
+	begin
+		i := 0;
+		seed := 65;
+		while i < 16 do
+		begin
+			seed := (seed * 137 + 221 + i) mod 101;
+			x[i] := seed;
+			i := i + 1
+		end;
+		PrintArray("Initial array: ", x, 0, 15);
+		MergeSort(x, 0, 15);
+		PrintArray("Sorted array: ", x, 0, 15)
+	end.
