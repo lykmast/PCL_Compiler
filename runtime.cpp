@@ -1,42 +1,61 @@
 #include "ast.hpp"
+// common helper functions used in multiple basic members
+inline void print_stack(){
+	std::cout<<"STACK:"<<std::endl;
+	for(auto p : rt_stack ){
+		if(p)
+			std::cout<<*p;
+		else
+			std::cout<<"EMPTY";
+	std::cout<<std::endl;
+	}
+}
 
-UnnamedLValue* UnnamedLValue::getBox(){
-	return this;
-}
-value UnnamedLValue::eval(){
-	return val;
-}
-void UnnamedLValue::let(value v){
-	val=v;
+
+LValue* Brackets::element(){
+	// i= index
+	value v = expr->eval();
+	int i = v.i;
+	// find arrconst by eval
+	v = lvalue->eval();
+	Arrconst *arr = static_cast<Arrconst*>(v.lval);
+	// retrieve i-th element
+	return arr->get_element(i);
 }
 
-value Rconst::eval(){
-	value v; v.r=num;
-	return v;
+LValue* StaticArray::get_element(int i){
+	return rt_stack[offset+i*child_size]; // offset is absolute
 }
+LValue* DynamicArray::get_element(int i){
+	return arr[i];
+}
+
+
+int Id::find_absolute_offset(){
+/* finds absolute offset of id in stack (
+    in contrast with relative to fp)*/
+	unsigned long prev_fp=fp;
+	for(int diff=current_nesting-decl_nesting; diff>0; diff--){
+		// if id is declared in outer scope
+		//    follows access links until correct frame is found
+		prev_fp=rt_stack[prev_fp]->eval().uli;
+	}
+	return prev_fp+offset;
+}
+
+
+// Dynamic object creation
+// UnnamedLValue* Type::create()
 UnnamedLValue* REAL::create() const{
 	return new UnnamedLValue(REAL::getInstance(),true);
 }
 
-value Iconst::eval() {
-	value v; v.i=num;
-	return v;
-}
 UnnamedLValue* INTEGER::create() const{
 	return new UnnamedLValue(INTEGER::getInstance(),true);
 }
 
-value Cconst::eval() {
-	value v; v.c=ch;
-	return v;
-}
 UnnamedLValue* CHARACTER::create() const{
 	return new UnnamedLValue(CHARACTER::getInstance(),true);
-}
-
-value Pconst::eval() {
-	value v; v.lval=ptr;
-	return v;
 }
 UnnamedLValue* PtrType::create() const{
 	return new UnnamedLValue(new PtrType(type),true);
@@ -46,48 +65,58 @@ UnnamedLValue* ArrType::create() const{
 	return new DynamicArray(size,type);
 }
 
-value Bconst::eval() {
-	value v; v.b=boo;
-	return v;
-}
 UnnamedLValue* BOOLEAN::create() const{
 	return new UnnamedLValue(BOOLEAN::getInstance(),true);
 }
-
-value Id::eval(){
-	int abs_ofs=find_absolute_offset();
-	value v = rt_stack[abs_ofs]->eval();
-	if(!v.lval and !type->get_name().compare("array")){
-		ArrType* arrT=static_cast<ArrType*>(type);
-		create_static_array(abs_ofs, arrT);
-		return rt_stack[abs_ofs]->eval();
-	}
-	else return v;
-}
+// StaticArray creation
+//   (used in Id::eval() and Id::getBox())
 void Id::create_static_array(int abs_ofs, ArrType* t){
 	Type* inside_t=t->get_type();
 	int s = t->get_size();
 		rt_stack[abs_ofs] = new StaticArray(s,inside_t,abs_ofs+1);
 }
-void Id::let(value v){
-	rt_stack[find_absolute_offset()]->let(v);
-}
-UnnamedLValue* Id::getBox(){
-	int abs_ofs=find_absolute_offset();
-	value v = rt_stack[abs_ofs]->eval();
-	if(!v.lval and !type->get_name().compare("array")){
-		ArrType* arrT=static_cast<ArrType*>(type);
-		create_static_array(abs_ofs, arrT);
-	}
-	return rt_stack[abs_ofs]->getBox();
+
+// value Expr::eval()
+//   evaluates expression; returns result (of type value)
+value UnnamedLValue::eval(){
+	return val;
 }
 
-int Id::find_absolute_offset(){
-	unsigned long prev_fp=fp;
-	for(int diff=current_nesting-decl_nesting; diff>0; diff--){
-		prev_fp=rt_stack[prev_fp]->eval().uli;
+value Rconst::eval(){
+	value v; v.r=num;
+	return v;
+}
+
+value Iconst::eval() {
+	value v; v.i=num;
+	return v;
+}
+
+value Cconst::eval() {
+	value v; v.c=ch;
+	return v;
+}
+
+value Pconst::eval() {
+	value v; v.lval=ptr;
+	return v;
+}
+
+value Bconst::eval() {
+	value v; v.b=boo;
+	return v;
+}
+
+value Id::eval(){
+	int abs_ofs=find_absolute_offset();
+	value v = rt_stack[abs_ofs]->eval();
+	if(!v.lval and !type->get_name().compare("array")){ // empty array
+		// create static array before returning
+		ArrType* arrT=static_cast<ArrType*>(type);
+		create_static_array(abs_ofs, arrT);
+		return rt_stack[abs_ofs]->eval();
 	}
-	return prev_fp+offset;
+	else return v;
 }
 
 value Op::eval() {
@@ -141,7 +170,7 @@ value Op::eval() {
 		}
 	}
 	else if(!(op.compare("-")) and right) {
-	//BinOp
+		//BinOp
 		rightValue=right->eval();
 
 		int li=0,ri=0;
@@ -183,7 +212,7 @@ value Op::eval() {
 		}
 	}
 	else if(!(op.compare("*"))) {
-	//BinOp
+		//BinOp
 		rightValue=right->eval();
 
 		int li=1,ri=1;
@@ -283,13 +312,13 @@ value Op::eval() {
 		}
 		switch (type) {
 			case 'n':
-				ret.b = li+lr!=ri+rr;
-				break;
+			ret.b = li+lr!=ri+rr;
+			break;
 			case 'c': case 'b':
-				ret.b= li!=ri;
-				break;
+			ret.b= li!=ri;
+			break;
 			default:
-				ret.b = rptr!=lptr;
+			ret.b = rptr!=lptr;
 		}
 
 	}
@@ -335,13 +364,13 @@ value Op::eval() {
 		}
 		switch (type) {
 			case 'n':
-				ret.b = li+lr==ri+rr;
-				break;
+			ret.b = li+lr==ri+rr;
+			break;
 			case 'c': case 'b':
-				ret.b= li==rr;
-				break;
+			ret.b= li==rr;
+			break;
 			default:
-				ret.b = rptr==lptr;
+			ret.b = rptr==lptr;
 		}
 	}
 
@@ -463,43 +492,85 @@ value Dereference::eval(){
 	value v = expr->eval();
 	return (v.lval)->eval();
 }
-void Dereference::let(value v){
-	value vlval = expr->eval();
-	(vlval.lval)->let(v);
+
+value Brackets::eval(){
+	return element()->eval();
 }
+
+std::vector<value> ExprList::eval(std::vector<bool> by_ref){
+	// eval every expression
+	// considering passing mode (by-reference / by-value)
+	std::vector<value> ret(list.size());
+	for(uint i=0; i<list.size(); i++){
+		if(by_ref[i]){ // passing mode is by-reference
+			// return same container by getBox
+			ret[i].lval=static_cast<LValue*>(list[i])->getBox();
+		}
+		else{
+			ret[i]=list[i]->eval();
+		}
+	}
+	return ret;
+}
+//   (for FunctionCall::eval() see in run)
+
+
+// UnnamedLValue * LValue::getBox
+//    returns UnnamedLValue which is
+//    the fundamental container of values
+UnnamedLValue* UnnamedLValue::getBox(){
+	return this;
+}
+
+UnnamedLValue* Id::getBox(){
+	int abs_ofs=find_absolute_offset();
+	value v = rt_stack[abs_ofs]->eval();
+	if(!v.lval and !type->get_name().compare("array")){ // empty array
+		// create static array before returning
+		ArrType* arrT=static_cast<ArrType*>(type);
+		create_static_array(abs_ofs, arrT);
+	}
+	return rt_stack[abs_ofs]->getBox();
+}
+
 UnnamedLValue* Dereference::getBox(){
 	value v = expr->eval();
 	return (v.lval)->getBox();
 }
 
-value Brackets::eval(){
-	return element()->eval();
-}
-void Brackets::let(value v){
-	element()->let(v);
-}
 UnnamedLValue* Brackets::getBox(){
 	return element()->getBox();
 }
-LValue* Brackets::element(){
-	value v = expr->eval();
-	int i = v.i;
-	v = lvalue->eval();
-	Arrconst *arr = static_cast<Arrconst*>(v.lval);
-	return arr->get_element(i);
-}
-
-LValue* StaticArray::get_element(int i){
-	return rt_stack[i*child_size+offset];
-}
-LValue* DynamicArray::get_element(int i){
-	return arr[i];
-}
 
 
+
+// void LValue::let(value )
+//    assigns value to LValue
+void UnnamedLValue::let(value v){
+	val=v;
+}
+
+void Id::let(value v){
+	rt_stack[find_absolute_offset()]->let(v);
+}
+
+void Dereference::let(value v){
+	// vlval.lval is pointer to LValue expecting assignment
+	value vlval = expr->eval();
+	(vlval.lval)->let(v);
+}
+
+void Brackets::let(value v){
+	element()->let(v);
+}
+
+
+
+// void Stmt::run()
 void Let::run() const{
 	value v = expr->eval();
-	if(different_types and is_right_int){
+	if(different_types and is_right_int){ //right is integer and left is real
+		// first convert integer to real
 		v.r=v.i;
 	}
 	lvalue->let(v);
@@ -523,7 +594,8 @@ void While::run() const{
 }
 
 void New::run() const{
-	if(expr){
+	if(expr){ // new array object
+		// i=size of array
 		value v = expr->eval();
 		int i = v.i;
 		if(i<=0) {
@@ -533,19 +605,26 @@ void New::run() const{
 				<<std::endl;
 			exit(1);
 		}
+		// get array-type contained in pointer
 		Type* idType=lvalue->get_type();
 		PtrType* p=static_cast<PtrType*>(idType);
 		Type* t=p->get_type();
 		ArrType* arrT = static_cast<ArrType*>(t);
+		// transform array-type to array-type with size
 		ArrType* arrT_size = new ArrType(i,arrT->get_type());
+		// create dynamic array according to array-type with size
 		value vlval; vlval.lval = arrT_size->create();
+		// assign pointer of new object to lvalue
 		lvalue->let(vlval);
 	}
-	else{
+	else{ // new non-array object
+		// get type contained in pointer
 		Type* idType=lvalue->get_type();
 		PtrType* p=static_cast<PtrType*>(idType);
 		Type* t=p->get_type();
+		// create dynamic object according to type
 		value vlval; vlval.lval = t->create();
+		// assign pointer of new object to lvalue
 		lvalue->let(vlval);
 	}
 }
@@ -589,45 +668,23 @@ void StmtList::run() const{
 }
 
 
-std::vector<value> ExprList::eval(std::vector<bool> by_ref){
-	std::vector<value> ret(list.size());
-	for(uint i=0; i<list.size(); i++){
-		if(by_ref[i]){
-			ret[i].lval=static_cast<LValue*>(list[i]);
-		}
-		else{
-			ret[i]=list[i]->eval();
-		}
-	}
-	return ret;
-}
-
-
-inline void print_stack(){
-	std::cout<<"STACK:"<<std::endl;
-	for(auto p : rt_stack ){
-		if(p)
-			std::cout<<*p;
-		else
-			std::cout<<"EMPTY";
-	std::cout<<std::endl;
-	}
-}
-
 void Body::run() const{
 	statements->run();
 	// print_stack();
 }
 
 void Program::run(){
+	// access link of program points to itself (al=fp=0)
 	value v; v.uli=0;
 	rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance()));
 	fp=0;
+	// push empty boxes to program for locals
 	for(int i=0; i<body->get_size()-1; i++){
 		value v; v.lval=nullptr;
 		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
 	body->run();
+	// pop locals
 	for(int i=0; i<body->get_size(); i++){
 		delete rt_stack.back();
 		rt_stack.pop_back();
@@ -635,10 +692,15 @@ void Program::run(){
 }
 
 int Body::get_size(){
+/* returns size of locals and arguments of this body (
+   necessary for pushing correct number of empty boxes in stack) */
 	return size;
 }
 
 void Call::before_run(bool isFunction) const{
+/* prepare call by changing stack state (
+   evaluate arguments; push fp, access link, return value and arguments
+   to stack) */
 	// first evaluate arguments
 	std::vector<value> args(exprs->eval(by_ref));
 	// then start pushing things in the stack
@@ -666,8 +728,9 @@ void Call::before_run(bool isFunction) const{
 	}
 	// push arguments in stack (lvalues for references)
 	for(uint i=0; i<args.size(); i++){
-		if(by_ref[i]){
-			rt_stack.push_back(args[i].lval->getBox());
+		if(by_ref[i]){ // passing by-reference
+			// exprs->eval has evaled expr to box (UnnamedLValue*)
+			rt_stack.push_back(static_cast<UnnamedLValue*>(args[i].lval));
 		}
 		else{
 			rt_stack.push_back(new UnnamedLValue(args[i],ANY::getInstance()));
@@ -686,6 +749,8 @@ void Call::before_run(bool isFunction) const{
 }
 
 void Call::after_run(bool isFunction) const{
+/* restores stack state (restore fp,
+   pop access link, arguments, locals and result) */
 	// restore old fp (stack[next_fp-1])
 	unsigned long next_fp=fp;
 	fp=rt_stack[next_fp-1]->eval().uli;
@@ -700,7 +765,6 @@ void Call::after_run(bool isFunction) const{
 		}
 		rt_stack.pop_back();
 	}
-
 
 	if(isFunction){
 		// pop result
@@ -720,7 +784,7 @@ void ProcCall::run() const{
 	body->run();
 	after_run();
 }
-
+// belongs to eval
 value FunctionCall::eval(){
 	before_run(true); // flag for function
 	body->run();

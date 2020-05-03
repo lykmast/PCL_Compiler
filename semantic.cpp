@@ -11,8 +11,8 @@ void Id::sem(){
 	}
 	type = e->type;
 	offset = e->offset;
-	decl_nesting = e->nesting;
-	current_nesting=st.getNestingOfCurrentScope();
+	decl_nesting = e->nesting; // nesting level of declaration
+	current_nesting=st.getNestingOfCurrentScope(); // nesting level of use
 }
 
 void Op::sem(){
@@ -165,29 +165,40 @@ void Let::sem(){
 	}
 	if(rType->doCompare(INTEGER::getInstance())){
 		is_right_int=true;
+		// needed flag to convert int to real before assignment
 	}
 
 }
 
 bool Let::typecheck(Type* lType, Type* rType){
+ /* is rType compatible for assignment with lType? */
+	// same types are compatible
 	if(lType->doCompare(rType)) return true;
 
 	if(lType->doCompare(REAL::getInstance()) and rType->doCompare(INTEGER::getInstance()))
+	// int is compatible with real
 		return true;
+
 	if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
+	 // ^array-type WITHOUT size of t is compatible with ^array-type WITH size of t
+		// extract inner types from pointers
 		PtrType* lpType=static_cast<PtrType*>(lType);
 		PtrType* rpType=static_cast<PtrType*>(rType);
 		Type* linType=lpType->get_type();
 		Type* rinType=rpType->get_type();
+		// try to cast inner types as arrays
 		if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
 			ArrType* larrType=static_cast<ArrType*>(linType);
 			ArrType* rarrType=static_cast<ArrType*>(rinType);
+			// check sizes (left must be -1, right must be >0)
 			if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
+				// extract inner types from arrays (must be same type)
 				if(larrType->get_type()->doCompare(rarrType->get_type()))
 					return true;
 			}
 		}
 	}
+	// incompatible types
 	return false;
 }
 
@@ -219,7 +230,7 @@ void While::sem(){
 
 void New::sem(){
 	lvalue->sem();
-	if(expr){
+	if(expr){ // new array object
 		expr->sem();
 		if(!(expr->get_type()->doCompare(INTEGER::getInstance())) ){
 			/*TODO ERROR incorrect type*/
@@ -228,7 +239,9 @@ void New::sem(){
 				<<std::endl;
 			exit(1);
 		}
+		// lvalue must have type : ^array
 		Type* idType=lvalue->get_type();
+		// try to cast as pointer-type
 		if(idType->get_name().compare("pointer") ){
 			/*TODO ERROR incorrect type*/
 			std::cerr<<
@@ -236,8 +249,10 @@ void New::sem(){
 				<<std::endl;
 			exit(1);
 		}
+		// get inner type of pointer
 		PtrType* p=static_cast<PtrType*>(idType);
 		Type* t=p->get_type();
+		// check if inner type is array-type
 		if(t->get_name().compare("array") ){
 			/*TODO ERROR incorrect type*/
 			std::cerr<<
@@ -246,7 +261,8 @@ void New::sem(){
 			exit(1);
 		}
 	}
-	else{
+	else{ // new non-array object
+		// lvalue must have type: ^t
 		Type* idType=lvalue->get_type();
 		if(idType->get_name().compare("pointer") ){
 			/*TODO ERROR incorrect type*/
@@ -260,6 +276,7 @@ void New::sem(){
 
 void Dispose::sem(){
 	lvalue->sem();
+	// lvalue must be of type pointer
 	if(lvalue->get_type()->get_name().compare("pointer")){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
@@ -271,7 +288,9 @@ void Dispose::sem(){
 
 void DisposeArr::sem(){
 	lvalue->sem();
+	// lvalue must be of type: ^array
 	Type* t=lvalue->get_type();
+	// try to cast as pointer
 	if(t->get_name().compare("pointer")){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
@@ -280,6 +299,7 @@ void DisposeArr::sem(){
 		exit(1);
 	}
 	PtrType *pt = static_cast<PtrType*>(t);
+	// check if inner type is array-type
 	if(pt->get_name().compare("array")){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
@@ -300,11 +320,14 @@ void LabelDecl::sem(){
 }
 
 void VarDecl::sem(){
+	// insert variable to symbol table
 	int s=get_sizeof(type);
 	st.insert(id,type,s);
 }
 
 int VarDecl::get_sizeof(Type* t){
+	// find size of variable in stack
+	//   (it is different only for static arrays)
 	if(!t->get_name().compare("array")){
 		// t is ArrType
 		ArrType* arr_type=static_cast<ArrType*>(t);
@@ -316,7 +339,7 @@ int VarDecl::get_sizeof(Type* t){
 			return s*get_sizeof(inside)+1;
 		}
 	}
-	// non-static-array types have size 1 in stack
+	// non static-array types have size 1 in stack
 	return 1;
 }
 
@@ -327,6 +350,7 @@ void DeclList::sem(){
 
 void Body::sem(){
 	if(!isDefined()){
+		// body not defined yet
 		return;
 	}
 	declarations->sem();
@@ -334,83 +358,98 @@ void Body::sem(){
 	size = st.getSizeOfCurrentScope();
 }
 
-void Procedure::sem(){
-	std::vector<Type*> formal_types=formals->get_type();
-	std::vector<bool> by_ref=formals->get_by_ref();
-	if(!body->isDefined()){
-		CallableType *proc_type=new ProcedureType(formal_types, by_ref);
-		st.insert_function(id,proc_type,body);
-		return;
-	}
+void Procedure::sem_helper(bool isFunction, Type* ret_type){
 	FunctionEntry* e = st.function_decl_lookup(id);
 	if(e and e->body->isDefined()){
-		std::cerr<<"Procedure "<<id<<" already fully declared."<<std::endl;
+		if(isFunction){
+			std::cerr<<"Function "<<id<<" already fully declared in this scope."<<std::endl;
+		}
+		else{
+			std::cerr<<"Procedure "<<id<<" already fully declared in this scope."<<std::endl;
+		}
 		exit(1);
 	}
-	if(e){
+
+	std::vector<Type*> formal_types=formals->get_type();
+	std::vector<bool> by_ref=formals->get_by_ref();
+	if(e){ // existent previous declaration without body.
+		// must be same type of callable (function / procedure) with
+		//   with previous declaration.
 		if(e->type->get_name().compare(decl_type)){
 			std::cerr<<"Previous declaration of "<<id<<" is not a "<<decl_type<<"."<<std::endl;
 			exit(1);
 		}
-		ProcedureType* proc_type=static_cast<ProcedureType*>(e->type);
-		proc_type->typecheck_args(formal_types);
-		proc_type->check_passing(by_ref);
-		e->body->add_body(body);
-	}
-	else{
-		CallableType *proc_type=new ProcedureType(formal_types, by_ref);
-		st.insert_function(id, proc_type, body);
+		// types and passing modes must match with previous declaration
+		//   (will fail if not).
+		if(isFunction){
+			FunctionType* func_type=static_cast<FunctionType*>(e->type);
+			Type* ret_t=func_type->get_ret_type();
+			if(!ret_t->doCompare(ret_type)){
+				std::cerr<<"Can't declare function "<<id<<" with different return type."<<std::endl;
+				exit(1);
+			}
+			func_type->typecheck_args(formal_types);
+			func_type->check_passing(by_ref);
+		}
+		else{
+			ProcedureType* proc_type=static_cast<ProcedureType*>(e->type);
+			proc_type->typecheck_args(formal_types);
+			proc_type->check_passing(by_ref);
+		}
 	}
 
+	if(!body->isDefined()){
+		// this is only subprogram header
+		CallableType *subp_type;
+		if(isFunction){
+			subp_type=new FunctionType(ret_type, formal_types, by_ref);
+		}
+		else{
+			subp_type=new ProcedureType(formal_types, by_ref);
+		}
+		st.insert_function(id,subp_type,body);
+		// no body to sem; return.
+		return;
+	}
+
+	// this is full declaration of subprogram
+	if(e){ // existent previous declaration.
+		// attach body to previous declaration.
+		e->body->add_body(body);
+	}
+	else{ // first declaration of this subprogram
+		CallableType *subp_type;
+		if(isFunction){
+			subp_type=new FunctionType(ret_type, formal_types, by_ref);
+		}
+		else{
+			subp_type=new ProcedureType(formal_types, by_ref);
+		}
+		st.insert_function(id,subp_type,body);
+	}
+
+	// valid subprogram with body
 	st.openScope(id);
+	if(isFunction){
+		// declare result of function as first local of function (offset 1 from fp)
+		VarDecl v(new Decl("result","var"),ret_type); v.sem();
+	}
 	formals->sem();
 	body->sem();
 	st.closeScope();
 }
 
-void Function::sem(){
-	std::vector<Type*> formal_types=formals->get_type();
-	std::vector<bool> by_ref=formals->get_by_ref();
-	if(!body->isDefined()){
-		CallableType *func_type=new FunctionType(ret_type, formal_types, by_ref);
-		st.insert_function(id,func_type,body);
-		return;
-	}
-	FunctionEntry* e = st.function_decl_lookup(id);
-	if(e and e->body->isDefined()){
-		std::cerr<<"Function "<<id<<" already fully declared."<<std::endl;
-		exit(1);
-	}
-	if(e){
-		if(e->type->get_name().compare(decl_type)){
-			std::cerr<<"Previous declaration of "<<id<<" is not a "<<decl_type<<"."<<std::endl;
-			exit(1);
-		}
-		FunctionType* func_type=static_cast<FunctionType*>(e->type);
-		Type* ret_t=func_type->get_ret_type();
-		if(!ret_t->doCompare(ret_type)){
-			std::cerr<<"Can't declare function "<<id<<" with different return type."<<std::endl;
-			exit(1);
-		}
-		func_type->typecheck_args(formal_types);
-		func_type->check_passing(by_ref);
-		e->body->add_body(body);
-	}
-	else{
-		CallableType *func_type=new FunctionType(ret_type, formal_types, by_ref);
-		st.insert_function(id, func_type, body);
-	}
+void Procedure::sem(){
+	sem_helper(); // not a Function
+}
 
-	st.openScope(id);
-	// declare result of function as first local of function (offset 1 from fp)
-	VarDecl v(new Decl("result","var"),ret_type); v.sem();
-	formals->sem();
-	body->sem();
-	st.closeScope();
+void Function::sem(){
+	sem_helper(true, ret_type); // flag and ret_type for Function
 }
 
 void Program::sem(){
 	st.openScope(name);
+	// load library subprograms
 	for(auto p:library_subprograms){
 		p->sem();
 	}
@@ -438,6 +477,9 @@ void FunctionCall::sem(){
 }
 
 FunctionEntry* Call::check_passing(){
+ /* validate call against declaration (
+    check that respective arguments have correct types);
+    return FunctionEntry. */
 	FunctionEntry* e = st.function_lookup(name);
 	body=e->body;
 	by_ref=e->type->get_by_ref();
@@ -453,11 +495,15 @@ FunctionEntry* Call::check_passing(){
 		Type* lType = types[i];
 		Type* rType = expr->get_type();
 
-		if(by_ref[i]){
+		if(by_ref[i]){ // pass by-reference
+			// ^type of parameter must be compatible for assignment with
+			//    ^type of argument
 			if(Let::typecheck(new PtrType(lType),new PtrType(rType)))
 			continue;
 		}
-		else{
+		else{ // pass by-value
+			// type of parameter must be compatible for assignment with
+			//    type of argument
 			if(Let::typecheck(lType, rType))
 			continue;
 		}
@@ -475,6 +521,7 @@ FunctionEntry* Call::check_passing(){
 }
 
 void Body::add_body(Body *b){
+ /* fill body object with declarations and statements*/
 	defined=true;
 	declarations=b->declarations;
 	statements=b->statements;
@@ -494,6 +541,7 @@ void Procedure::add_body(Body* bod){
 
 
 std::vector<bool> FormalDeclList::get_by_ref(){
+ /*return passing mode of each parameter in a vector*/
 	std::vector<bool> by_ref;
 	for(auto p=list.begin();p!=list.end();p++){
 		FormalDecl* f=static_cast<FormalDecl*>(*p);

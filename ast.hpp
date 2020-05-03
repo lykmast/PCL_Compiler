@@ -670,6 +670,7 @@ public:
 	void add_body(Body* bod);
 	virtual void sem() override;
 protected:
+	void sem_helper(bool isFunction=false, Type* ret_type=nullptr);
 	Body* body;
 	FormalDeclList* formals;
 };
