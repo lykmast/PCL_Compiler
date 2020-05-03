@@ -1,3 +1,8 @@
+/* ------------------------------------------
+parser.y
+Syntax parser for pcl compiler in bison.
+  Creates AST.
+------------------------------------------ */
 %{
 #include <cstdio>
 #include "pcl_lexer.hpp"

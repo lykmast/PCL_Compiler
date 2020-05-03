@@ -1,3 +1,8 @@
+/* ------------------------------------------
+runtime.cpp
+Contains member functions that are used in
+  runtime such as eval, let, run 
+------------------------------------------ */
 #include "ast.hpp"
 // common helper functions used in multiple basic members
 inline void print_stack(){

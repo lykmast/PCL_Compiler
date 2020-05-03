@@ -1,3 +1,8 @@
+/* ------------------------------------------
+ast.hpp
+Contains class declarations for AST and all
+  subclasses.
+------------------------------------------ */
 #pragma once
 #include <iostream>
 #include <map>

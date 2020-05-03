@@ -1,3 +1,7 @@
+/* ------------------------------------------
+pcl_lexer.l
+Lexical parser for pcl compiler in flex
+------------------------------------------ */
 %option noyywrap
 %option yylineno
 %x C_COMMENT

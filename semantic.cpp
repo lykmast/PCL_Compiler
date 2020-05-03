@@ -1,3 +1,8 @@
+/* ------------------------------------------
+semantic.cpp
+Contains member functions that are used in
+  semantic analysis (mainly sem) 
+------------------------------------------ */
 #include "ast.hpp"
 #include "symbol.hpp"
 #include "library.hpp"

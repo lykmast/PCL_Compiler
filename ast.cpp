@@ -1,3 +1,8 @@
+/* ------------------------------------------
+ast.cpp
+Contains constructors and printOn for AST and
+  all subclasses.
+------------------------------------------ */
 #include "ast.hpp"
 
 Const::Const(Type* ty):type(ty){}

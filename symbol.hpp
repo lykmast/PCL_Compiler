@@ -1,3 +1,8 @@
+/* ------------------------------------------
+symbol.hpp
+Contains symbol table and symbol entities
+  (SymbolEntry, FunctionEntry, Scope)
+------------------------------------------ */
 #pragma once
 
 #include <iostream>
