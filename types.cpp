@@ -21,7 +21,9 @@ bool Type::should_delete() const{//should not delete Singleton
 	return false;
 }
 bool Type::doCompare(Type* t){
-	return !(name.compare(t->get_name()));
+	return !(name.compare(t->get_name()))
+		or !name.compare("any")
+		or !t->get_name().compare("any");
 }
 
 
