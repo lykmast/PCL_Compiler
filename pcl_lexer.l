@@ -21,13 +21,17 @@ Lexical parser for pcl compiler in flex
 	char c;
 	std::string *s;
 	bool added;
+	char msg[100];
+	char linebuf[500];
 %}
 L [a-zA-Z]
 D [0-9]
 E \\(n|t|r|\'|\"|0|\\)
 W [ \t\r\n]
 %%
-"var" {return T_var;/*'*/}
+\n.* { strncpy(linebuf, yytext+1, sizeof(linebuf)); /* save the next line' */
+       yyless(1); /* give back all but the \n to rescan */}
+"var" {return T_var;}
 "integer" {return T_integer;}
 "boolean" {return T_boolean;}
 "char" {return T_char;}
@@ -73,20 +77,21 @@ W [ \t\r\n]
 <STRING>\\\\ {s->push_back('\\');}
 <STRING>[^'\"] {s->push_back(yytext[0]);/*'*/}
 <STRING>\" {BEGIN(INITIAL);yylval.var=s; return T_sconst;/*"*/}
-<STRING>. {printf("invalid string\n"); exit(1);}
+<STRING>.$ {yyerror("unterminated string");}
+<STRING>. {sprintf(msg,"invalid character '%c' while parsing string",yytext[0]);yyerror(msg);}
 
 
 \' {BEGIN(CHARACTER); added=false;/*'*/}
-<CHARACTER>\\n {if(!added){c='\n'; added=true;}else printf("invalid character\n");}
-<CHARACTER>\\t {if(!added){c='\t'; added=true;}else printf("invalid character\n");}
-<CHARACTER>\\r {if(!added){c='\r'; added=true;}else printf("invalid character\n");}
-<CHARACTER>\\0 {if(!added){c='\0'; added=true;}else printf("invalid character\n");}
-<CHARACTER>\\\' {if(!added){c='\''; added=true;}else printf("invalid character\n");}
-<CHARACTER>\\\" {if(!added){c='\"'; added=true;}else printf("invalid character\n");/*"*/}
-<CHARACTER>\\\\ {if(!added){c='\\'; added=true;}else printf("invalid character\n");}
-<CHARACTER>[^'\"] {if(!added){c=yytext[0]; added=true;}else printf("invalid character\n");/*'*/}
+<CHARACTER>\\n {if(!added){c='\n'; added=true;}else yyerror("too long for character");}
+<CHARACTER>\\t {if(!added){c='\t'; added=true;}else yyerror("too long for character");}
+<CHARACTER>\\r {if(!added){c='\r'; added=true;}else yyerror("too long for character");}
+<CHARACTER>\\0 {if(!added){c='\0'; added=true;}else yyerror("too long for character");}
+<CHARACTER>\\\' {if(!added){c='\''; added=true;}else yyerror("too long for character");}
+<CHARACTER>\\\" {if(!added){c='\"'; added=true;}else yyerror("too long for character");/*"*/}
+<CHARACTER>\\\\ {if(!added){c='\\'; added=true;}else yyerror("too long for character");}
+<CHARACTER>[^'\"] {if(!added){c=yytext[0]; added=true;}else yyerror("too long for character");/*'*/}
 <CHARACTER>\' {BEGIN(INITIAL);yylval.ch=c; return T_cconst;/*'*/}
-<CHARACTER>. {printf("invalid character\n"); exit(1);}
+<CHARACTER>. {sprintf(msg,"invalid character %c",yytext[0]);yyerror(msg); }
 
 ":=" {return T_assign;}
 "<>" {return T_dt;}
@@ -105,8 +110,9 @@ W [ \t\r\n]
 %%
 
 void yyerror(const char *msg) {
-  fprintf(stderr, "%s near line %d\n", msg,yylineno);
-  exit(1);
+
+	fprintf(stderr, "%d: %s at %s in line:\n %s\n", yylineno,msg,yytext,linebuf);
+	exit(1);
 }
 
 // #ifdef yyFlexLexer
