@@ -98,11 +98,10 @@ value Op::eval() {
 	value leftValue=left->eval();
 	value rightValue;
 	value ret;
-	if(right){
-		rightValue=right->eval();
-	}
 	if(!(op.compare("+")) and right){
 		//BinOp
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		if(leftType->doCompare(realType)){
@@ -143,6 +142,8 @@ value Op::eval() {
 	}
 	else if(!(op.compare("-")) and right) {
 	//BinOp
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		if(leftType->doCompare(realType)){
@@ -183,6 +184,8 @@ value Op::eval() {
 	}
 	else if(!(op.compare("*"))) {
 	//BinOp
+		rightValue=right->eval();
+
 		int li=1,ri=1;
 		double lr=1,rr=1;
 		if(leftType->doCompare(realType)){
@@ -225,16 +228,22 @@ value Op::eval() {
 	}
 
 	else if( !(op.compare("div"))){
+		rightValue=right->eval();
+
 		int li=leftValue.i;
 		int ri=rightValue.i;
 		ret.i = li/ri;
 	}
 	else if(!(op.compare("mod"))) {
+		rightValue=right->eval();
+
 		int li=leftValue.i;
 		int ri=rightValue.i;
 		ret.i = li%ri;
 	}
 	else if(!(op.compare("<>"))) {
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		LValue* lptr, *rptr;
@@ -285,6 +294,8 @@ value Op::eval() {
 
 	}
 	else if(!(op.compare("="))) {
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		LValue* lptr, *rptr;
@@ -335,6 +346,8 @@ value Op::eval() {
 	}
 
 	else if(!(op.compare("<="))) {
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		if(leftType->doCompare(realType)){
@@ -352,6 +365,8 @@ value Op::eval() {
 		ret.b = li+lr<=ri+rr;
 	}
 	else if(!(op.compare(">="))) {
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		if(leftType->doCompare(realType)){
@@ -369,6 +384,8 @@ value Op::eval() {
 		ret.b = li+lr>=ri+rr;
 	}
 	else if(!(op.compare(">"))) {
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		if(leftType->doCompare(realType)){
@@ -386,6 +403,8 @@ value Op::eval() {
 		ret.b = li+lr > ri+rr;
 	}
 	else if(!(op.compare("<"))) {
+		rightValue=right->eval();
+
 		int li=0,ri=0;
 		double lr=0,rr=0;
 		if(leftType->doCompare(realType)){
@@ -404,13 +423,27 @@ value Op::eval() {
 	}
 	else if(!(op.compare("and"))) {
 		bool lb=leftValue.b;
-		bool rb=rightValue.b;
-		ret.b = lb and rb;
+		if(!lb){
+			// short-circuit and
+			ret.b=false;
+		}
+		else{
+			rightValue=right->eval();
+			bool rb=rightValue.b;
+			ret.b = lb and rb;
+		}
 	}
 	else if(!(op.compare("or"))) {
 		bool lb=leftValue.b;
-		bool rb=rightValue.b;
-		ret.b = lb or rb;
+		if(lb){
+			// short-circuit or
+			ret.b=true;
+		}
+		else{
+			rightValue=right->eval();
+			bool rb=rightValue.b;
+			ret.b = lb or rb;
+		}
 	}
 	else if(!(op.compare("not"))) {
 		//UnOp
