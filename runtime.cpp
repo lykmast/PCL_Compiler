@@ -260,6 +260,9 @@ value Op::eval() {
 		if(rightType->doCompare(realType)){
 			rr=rightValue.r;
 		}
+		else if(rightType->doCompare(intType)){
+			ri=rightValue.i;
+		}
 		else if (rightType->doCompare(CHARACTER::getInstance())){
 			ri=rightValue.c;
 		}
@@ -306,6 +309,9 @@ value Op::eval() {
 		}
 		if(rightType->doCompare(realType)){
 			rr=rightValue.r;
+		}
+		else if (rightType->doCompare(intType)){
+			ri=rightValue.i;
 		}
 		else if (rightType->doCompare(CHARACTER::getInstance())){
 			ri=rightValue.c;
