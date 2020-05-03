@@ -1,4 +1,5 @@
 %option noyywrap
+%option yylineno
 %x C_COMMENT
 %x STRING
 %x CHARACTER
@@ -100,7 +101,7 @@ W [ \t\r\n]
 %%
 
 void yyerror(const char *msg) {
-  fprintf(stderr, "%s\n", msg);
+  fprintf(stderr, "%s near line %d\n", msg,yylineno);
   exit(1);
 }
 
