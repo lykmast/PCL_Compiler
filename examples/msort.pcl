@@ -59,17 +59,18 @@ program msort;
 				merge(arr, l, m, r);
 			end;
 		end;(* end procedure QuickSort *)
-	var i: integer; x: array [16] of integer; seed : integer;
+	var i,s: integer; x: array [16] of integer; seed : integer;
 	begin
+		s:=16;
 		i := 0;
 		seed := 65;
-		while i < 16 do
+		while i < s do
 		begin
 			seed := (seed * 137 + 221 + i) mod 101;
 			x[i] := seed;
 			i := i + 1
 		end;
-		PrintArray("Initial array: ", x, 0, 15);
-		MergeSort(x, 0, 15);
-		PrintArray("Sorted array: ", x, 0, 15)
+		PrintArray("Initial array: ", x, 0, s-1);
+		MergeSort(x, 0, s-1);
+		PrintArray("Sorted array: ", x, 0, s-1)
 	end.

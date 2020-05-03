@@ -1,5 +1,4 @@
 program factorial;
-	var x: integer;
 	function fact (i: integer) : integer;
 		begin
 			result:=0;
@@ -15,5 +14,7 @@ program factorial;
 			end;
 		end;
 	begin
-			x:=fact(10);
+		writeString("Give number (not big if possible because ... overflow):\n");
+		writeInteger(fact(readInteger()));
+		writeChar('\n');
 	end.
