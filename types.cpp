@@ -129,11 +129,14 @@ std::vector<Type*> CallableType::get_types(){
 	return formal_types;
 }
 
-void CallableType::add_outer(Type* t){
+std::vector<std::string> CallableType::get_outer_vars(){
+	return outer_vars;
+}
+
+void CallableType::add_outer(std::string name){
 	// variable that belongs to outer scope is add as implicit
 	//   argument passed by reference
-	outer_types.push_back(t);
-	outer_byref.push_back(true);
+	outer_vars.push_back(name);
 }
 
 FunctionType::FunctionType( Type* ret_ty ,std::vector<Type*> formalTs, std::vector<bool> ref):

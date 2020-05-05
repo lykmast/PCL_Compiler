@@ -8,6 +8,8 @@ Contains class declarations for AST and all
 #include <map>
 #include <vector>
 #include <string>
+#include <cstring>
+#include "pcl_lexer.hpp"
 
 
 class LValue;
@@ -26,9 +28,21 @@ union value{
 
 class AST {
 public:
+	void add_parse_info(int no, char* buf,char* txt){
+		lineno=no;
+		strncpy(linebuf,buf,500);
+		strncpy(text,txt,100);
+	}
 	virtual ~AST() {}
 	virtual void printOn(std::ostream &out) const {out<<"";}
 	virtual void sem(){}
+	void report_error(char*msg){
+		// lyyerror(lineno,linebuf,text,msg);
+	}
+protected:
+	int lineno;
+	char linebuf[500];
+	char text[100];
 };
 
 template<class T>
@@ -170,7 +184,6 @@ protected:
 	int size;
 };
 
-
 class CallableType: public Type{
 public:
 	CallableType(std::string func_type, std::vector<Type*> formalTs, std::vector<bool> ref);
@@ -184,13 +197,14 @@ public:
 
 	std::vector<Type*> get_types();
 
-	void add_outer(Type* t);
+	std::vector<std::string> get_outer_vars();
+
+	void add_outer(std::string name);
 
 protected:
 	std::vector<Type*> formal_types;
 	std::vector<bool> by_ref;
-	std::vector<Type*> outer_types;
-	std::vector<bool> outer_byref;
+	std::vector<std::string> outer_vars;
 };
 
 class FunctionType: public CallableType{
@@ -644,7 +658,7 @@ public:
 	std::vector<bool> get_by_ref();
 };
 
-
+class Call;
 class Body: public AST{
 public:
 	Body();
@@ -660,11 +674,14 @@ public:
 	virtual void printOn(std::ostream &out) const override ;
 
 	int get_size();
+	void add_call(Call *c);
 protected:
 	DeclList* declarations;
 	StmtList* statements;
 	int size;
 	bool defined;
+	// needed to add correct next_fp_offset at end of sem
+	std::vector<Call*> calls;
 };
 
 class Procedure:public Decl{
@@ -704,10 +721,12 @@ private:
 class Call{
 public:
 	Call(std::string nam, ExprList* exp);
+	void add_next_fp_offset(int ofs);
 protected:
 	std::string name;
 	ExprList* exprs;
 	std::vector<bool> by_ref;
+	ExprList* outer_vars;
 	int nesting_diff;
 	int next_fp_offset;
 	Body* body;
@@ -718,6 +737,7 @@ protected:
 
 	void after_run(bool isFunction=false) const;
 
+	void add_outer();
 
 };
 

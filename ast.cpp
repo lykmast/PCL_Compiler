@@ -282,8 +282,10 @@ void DeclList::toFormal(Type* t, bool ref){
 }
 
 
-Body::Body():declarations(nullptr),statements(nullptr),size(0),defined(false){}
-Body::Body(DeclList* d, StmtList* s):declarations(d),statements(s),size(0),defined(true){}
+Body::Body():declarations(nullptr),statements(nullptr),size(0),
+	defined(false),calls(){}
+Body::Body(DeclList* d, StmtList* s):declarations(d),statements(s),
+	size(0),defined(true),calls(){}
 Body::~Body(){delete declarations; delete statements;}
 void Body::printOn(std::ostream &out) const {
 	out << "Body("<<*declarations<<","<<*statements<<")";
@@ -308,7 +310,8 @@ void Program::printOn(std::ostream &out) const {
 
 
 Call::Call(std::string nam, ExprList* exp): name(nam), exprs(exp),
-	by_ref(exp->size()), nesting_diff(0), next_fp_offset(0), body(nullptr){}
+	by_ref(exp->size()), outer_vars(new ExprList()), nesting_diff(0), next_fp_offset(0),
+	body(nullptr){}
 
 ProcCall::ProcCall(std::string nam, ExprList* exp):Call(nam, exp){}
 void ProcCall::printOn(std::ostream &out) const {

@@ -1,7 +1,7 @@
 /* ------------------------------------------
 semantic.cpp
 Contains member functions that are used in
-  semantic analysis (mainly sem) 
+  semantic analysis (mainly sem)
 ------------------------------------------ */
 #include "ast.hpp"
 #include "symbol.hpp"
@@ -360,6 +360,10 @@ void Body::sem(){
 	}
 	declarations->sem();
 	statements->sem();
+	for(Call *c:calls){
+		// +1 is to account for saving old fp in stack frame of parent
+		c->add_next_fp_offset(st.getSizeOfCurrentScope()+1);
+	}
 	size = st.getSizeOfCurrentScope();
 }
 
@@ -480,6 +484,9 @@ void FunctionCall::sem(){
 	}
 	type=static_cast<FunctionType*>(e->type)->get_ret_type();
 }
+void Call::add_next_fp_offset(int ofs){
+	next_fp_offset=ofs;
+}
 
 FunctionEntry* Call::check_passing(){
  /* validate call against declaration (
@@ -518,9 +525,23 @@ FunctionEntry* Call::check_passing(){
 		exit(1);
 	}
 
+	// add implicit vars from outer scope
+	for(auto name: e->type->get_outer_vars()){
+		Expr* i = new Id(name); i->sem();
+		outer_vars->append(i);
+	}
 
 	nesting_diff=st.getNestingOfCurrentScope()-e->nesting;
-	next_fp_offset=st.getSizeOfCurrentScope()+1;
+	if(st.getNestingOfCurrentScope()==1){
+		//parent is program, so does not have implicit arguments
+		next_fp_offset=st.getSizeOfCurrentScope()+1;
+	}
+	else{
+		st.getParentOfCurrentScope()->body->add_call(this);
+		// next_fp_offset will be add from parent Body
+		//    to account for implicit arguments in the stack frame of parent
+		// next_fp_offset=st.getSizeOfCurrentScope()+1;
+	}
 	return e;
 
 }
@@ -530,6 +551,10 @@ void Body::add_body(Body *b){
 	defined=true;
 	declarations=b->declarations;
 	statements=b->statements;
+}
+
+void Body::add_call(Call *c){
+	calls.push_back(c);
 }
 
 bool Body::isDefined(){

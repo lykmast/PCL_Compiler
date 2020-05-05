@@ -38,6 +38,7 @@ public:
 	int getOffset() const { return offset; }
 	int getNesting() const { return nesting; }
 	int getSize() const { return size; }
+	FunctionEntry* getParent() const{return thisFunction;}
 	SymbolEntry *lookup(std::string name) {
 		if (locals.find(name) == locals.end()) return nullptr;
 		return &(locals[name]);
@@ -65,8 +66,9 @@ public:
 		functions[name] = FunctionEntry(t, nesting, bod);
 	}
 
-	void add_outer(Type* t){
-		thisFunction->type->add_outer(t);
+	void add_outer(Type* t, std::string name){
+		thisFunction->type->add_outer(name);
+		insert(name, t, 1);
 	}
 private:
 	std::map<std::string, SymbolEntry> locals;
@@ -91,10 +93,26 @@ public:
 		}
 	}
 	void closeScope() { scopes.pop_back(); };
+
 	SymbolEntry *lookup(std::string name) {
-		for (auto i = scopes.rbegin(); i != scopes.rend(); ++i) {
-			SymbolEntry *e = i->lookup(name);
-			if (e != nullptr) return e;
+		std::vector<Scope>::iterator it;
+		SymbolEntry *e;
+		e=scopes.back().lookup(name);
+		if(e) return e;
+
+		// it's on an outer scope (or not existent)
+		for (auto i = scopes.rbegin()+1; i != scopes.rend(); ++i) {
+			it=i.base();// forward 'it' points to next scope from i
+			e= i->lookup(name);
+			if (e != nullptr) break;
+		}
+		if(e){
+			// add e as implicit parameter
+			//   to all scopes from 'it' to end.
+			for(auto i= it; i!=scopes.end();++i){
+				i->add_outer(e->type, name);
+			}
+			return e;
 		}
 		std::cerr << "Unknown variable " << name << std::endl;
 		exit(1);
@@ -118,6 +136,7 @@ public:
 	void insert(std::string name, Type* t, int size=1) { scopes.back().insert(name, t, size); }
 	void insert_function(std::string name, CallableType* t, Body* bod) { scopes.back().insert_function(name, t, bod); }
 	int getNestingOfCurrentScope() const{ return scopes.back().getNesting();}
+	FunctionEntry *getParentOfCurrentScope() const {return scopes.back().getParent();}
 private:
 	std::vector<Scope> scopes;
 };

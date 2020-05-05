@@ -1,7 +1,7 @@
 /* ------------------------------------------
 runtime.cpp
 Contains member functions that are used in
-  runtime such as eval, let, run 
+  runtime such as eval, let, run
 ------------------------------------------ */
 #include "ast.hpp"
 // common helper functions used in multiple basic members
@@ -707,6 +707,9 @@ void Call::before_run(bool isFunction) const{
    evaluate arguments; push fp, access link, return value and arguments
    to stack) */
 	// first evaluate arguments
+	std::vector<value> outer_args(
+		outer_vars->eval(std::vector<bool>(outer_vars->size(),true))
+	);
 	std::vector<value> args(exprs->eval(by_ref));
 	// then start pushing things in the stack
 	unsigned long next_fp=fp+next_fp_offset;
@@ -742,13 +745,19 @@ void Call::before_run(bool isFunction) const{
 		}
 	}
 	// push empty spaces for callee locals (body size-arguments that are already pushed)
-	int size=body->get_size()-exprs->size()-1;
+	int size=body->get_size()-exprs->size()-1-outer_args.size();
 	if(isFunction)
 		size-=1;
 	for (int i = 0; i < size; ++i){
 		value v; v.lval=nullptr;
 		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
+
+	//push outer values AFTER locals passing them by reference
+	for(auto outer:outer_args){
+		rt_stack.push_back(static_cast<UnnamedLValue*>(outer.lval));
+	}
+
 	// set fp to next
 	fp=next_fp;
 }
@@ -759,8 +768,12 @@ void Call::after_run(bool isFunction) const{
 	// restore old fp (stack[next_fp-1])
 	unsigned long next_fp=fp;
 	fp=rt_stack[next_fp-1]->eval().uli;
+	// pop implicit parameters without deleting
+	for(uint i=0;i<outer_vars->size();i++){
+		rt_stack.pop_back();
+	}
 	// pop locals and arguments from stack
-	int size=body->get_size()-exprs->size()-1;
+	int size=body->get_size()-exprs->size()-1-outer_vars->size();
 	if(isFunction)
 		size-=1;
 	for (int i = 0; i < size; ++i) {delete rt_stack.back(); rt_stack.pop_back();}
