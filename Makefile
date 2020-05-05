@@ -29,9 +29,12 @@ pcl_lexer.cpp:pcl_lexer.l
 pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp symbol.hpp
 
 parser.hpp parser.cpp: parser.y
-	bison -dv -o parser.cpp parser.y
+	bison -d -o parser.cpp parser.y
 
 parser.o: parser.cpp pcl_lexer.hpp ast.hpp ast.cpp symbol.hpp
+
+semantic.o:semantic.cpp symbol.hpp
+	$(CC) $(CFLAGS) -c -o $@ $<
 
 %.o: %.cpp ast.hpp
 	$(CC) $(CFLAGS) -c -o $@ $<
