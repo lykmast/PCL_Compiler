@@ -360,6 +360,9 @@ void Body::sem(){
 	}
 	declarations->sem();
 	statements->sem();
+	// finally add correct size on calls
+	//    (correct size cannot be known from declarations->sem
+	//     because of outer variables)
 	for(Call *c:calls){
 		// +1 is to account for saving old fp in stack frame of parent
 		c->add_next_fp_offset(st.getSizeOfCurrentScope()+1);

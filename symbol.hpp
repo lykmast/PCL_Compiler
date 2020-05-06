@@ -32,9 +32,9 @@ struct FunctionEntry {
 
 class Scope {
 public:
-	Scope() : locals(), thisFunction(nullptr), offset(1), size(1), nesting(1) {}
+	Scope() : locals(), thisFunction(nullptr), offset(0), size(0), nesting(1) {}
 	Scope(int nest, FunctionEntry *e) :
-		locals(), thisFunction(e), offset(1), size(1), nesting(nest) {}
+		locals(), thisFunction(e), offset(0), size(0), nesting(nest) {}
 	int getOffset() const { return offset; }
 	int getNesting() const { return nesting; }
 	int getSize() const { return size; }
@@ -112,7 +112,8 @@ public:
 			for(auto i= it; i!=scopes.end();++i){
 				i->add_outer(e->type, name);
 			}
-			return e;
+			// return newly added entry on current scope
+			return scopes.back().lookup(name);
 		}
 		std::cerr << "Unknown variable " << name << std::endl;
 		exit(1);

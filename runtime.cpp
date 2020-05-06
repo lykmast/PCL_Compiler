@@ -40,11 +40,6 @@ int Id::find_absolute_offset(){
 /* finds absolute offset of id in stack (
     in contrast with relative to fp)*/
 	unsigned long prev_fp=fp;
-	for(int diff=current_nesting-decl_nesting; diff>0; diff--){
-		// if id is declared in outer scope
-		//    follows access links until correct frame is found
-		prev_fp=rt_stack[prev_fp]->eval().uli;
-	}
 	return prev_fp+offset;
 }
 
@@ -679,12 +674,9 @@ void Body::run() const{
 }
 
 void Program::run(){
-	// access link of program points to itself (al=fp=0)
-	value v; v.uli=0;
-	rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance()));
 	fp=0;
 	// push empty boxes to program for locals
-	for(int i=0; i<body->get_size()-1; i++){
+	for(int i=0; i<body->get_size(); i++){
 		value v; v.lval=nullptr;
 		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
@@ -716,21 +708,9 @@ void Call::before_run(bool isFunction) const{
 	// push current fp at next_fp-1 offset in stack
 	value v; v.uli=fp;
 	rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance())); //next_fp-1
-	// push access link at next_fp offset in stack
-	if(nesting_diff<0){
-		rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance())); //next_fp
-	}
-	else{
-		unsigned long prev_fp=fp;
-		for(int diff=nesting_diff; diff>0; diff--){
-			prev_fp=rt_stack[prev_fp]->eval().uli;
-		}
-		value v=rt_stack[prev_fp]->eval();
-		rt_stack.push_back(new UnnamedLValue(v,INTEGER::getInstance())); //next_fp
 
-	}
 	if(isFunction){
-		// push one more value for function result at next_fp+1 offset
+		// push one more value for function result at next_fp offset
 		value v; v.lval=nullptr;
 		rt_stack.push_back(new UnnamedLValue(v,ANY::getInstance()));
 	}
@@ -745,7 +725,7 @@ void Call::before_run(bool isFunction) const{
 		}
 	}
 	// push empty spaces for callee locals (body size-arguments that are already pushed)
-	int size=body->get_size()-exprs->size()-1-outer_args.size();
+	int size=body->get_size()-exprs->size()-outer_args.size();
 	if(isFunction)
 		size-=1;
 	for (int i = 0; i < size; ++i){
@@ -773,7 +753,7 @@ void Call::after_run(bool isFunction) const{
 		rt_stack.pop_back();
 	}
 	// pop locals and arguments from stack
-	int size=body->get_size()-exprs->size()-1-outer_vars->size();
+	int size=body->get_size()-exprs->size()-outer_vars->size();
 	if(isFunction)
 		size-=1;
 	for (int i = 0; i < size; ++i) {delete rt_stack.back(); rt_stack.pop_back();}
@@ -789,9 +769,6 @@ void Call::after_run(bool isFunction) const{
 		delete rt_stack.back();
 		rt_stack.pop_back();
 	}
-	// pop access link
-	delete rt_stack[next_fp];
-	rt_stack.pop_back();
 	// pop old fp
 	delete rt_stack[next_fp-1];
 	rt_stack.pop_back();
@@ -806,8 +783,8 @@ void ProcCall::run() const{
 value FunctionCall::eval(){
 	before_run(true); // flag for function
 	body->run();
-	// take function result from stack[fp+1]
-	value res = rt_stack[fp+1]->eval();
+	// take function result from stack[fp]
+	value res = rt_stack[fp]->eval();
 	after_run(true);
 	return res;
 }
