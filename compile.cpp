@@ -498,6 +498,20 @@ llvm::Value* Brackets::getAddr(){
 		arrTy->cgen(), arr, std::vector<llvm::Value*> {c32(0),index_v});
 }
 
+void LabelStmt::cgen(){
+	llvm::Function* TheFunction = ct.getFunction();
+	llvm::BasicBlock *LabelBB =
+		llvm::BasicBlock::Create(TheContext, label_id, TheFunction);
+	ct.insert_label(label_id, LabelBB);
+	Builder.CreateBr(LabelBB);
+	ct.setCurrentBB(LabelBB);
+	Builder.SetInsertPoint(LabelBB);
+	stmt->cgen();
+}
+
+void Goto::cgen(){
+	Builder.CreateBr(ct.label_lookup(label_id));
+}
 
 void Let::cgen(){
 	llvm::Value *e=expr->cgen();

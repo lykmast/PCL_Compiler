@@ -83,6 +83,20 @@ void Brackets::printOn(std::ostream &out) const{
 	out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
 }
 
+LabelStmt::LabelStmt(std::string id, Stmt* s):label_id(id), stmt(s) {}
+
+LabelStmt::~LabelStmt(){delete stmt;}
+
+void LabelStmt::printOn(std::ostream &out) const{
+	out<<"Label("<<label_id<<": "<<*stmt<<")";
+}
+
+Goto::Goto(std::string id): label_id(id) {}
+
+void Goto::printOn(std::ostream &out) const{
+	out<<"Goto("<<label_id<<")";
+}
+
 Let::Let(LValue* lval,Expr* e):lvalue(lval),expr(e),different_types(false),
 	is_right_int(false){}
 Let::~Let(){delete lvalue; delete expr;}

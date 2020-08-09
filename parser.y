@@ -190,8 +190,8 @@ stmt:
 | "if" expr "then" stmt "else" stmt {$$ = new If($2,$4,$6);}
 | "if" expr "then" stmt {$$ = new If($2,$4,nullptr);}
 | "while" expr "do" stmt {$$ = new While($2, $4);}
-| T_id ':' stmt { $$=$3;/*TODO $3->target($1); $$=$3; */}
-| "goto" T_id { $$=new Stmt();/*TODO $$ = new Goto($2);*/ }
+| T_id ':' stmt { $$=new LabelStmt(*$1, $3);}
+| "goto" T_id { $$ = new Goto(*$2);}
 | "return" {$$ = new Return();}
 | "new" '[' expr ']' l_value {$$ = new New($5,$3);}
 | "new" l_value {$$=new New($2,nullptr);}

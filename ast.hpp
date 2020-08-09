@@ -425,6 +425,28 @@ protected:
 	Expr* expr;
 };
 
+class LabelStmt: public Stmt{
+public:
+	LabelStmt(std::string id, Stmt* s);
+	~LabelStmt();
+	virtual void printOn(std::ostream &out) const override;
+	virtual void sem() override;
+	virtual void cgen() override;
+private:
+	std::string label_id;
+	Stmt* stmt;
+};
+
+class Goto: public Stmt{
+public:
+	Goto(std::string id);
+	virtual void printOn(std::ostream &out) const override;
+	virtual void sem() override;
+	virtual void cgen() override;
+private:
+	std::string label_id;
+};
+
 class Let: public Stmt {
 public:
 	Let(LValue* lval,Expr* e);

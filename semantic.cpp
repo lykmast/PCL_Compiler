@@ -205,6 +205,14 @@ void Let::sem(){
 
 }
 
+void LabelStmt::sem(){
+	st.label_lookup(label_id);
+}
+
+void Goto::sem(){
+	st.label_lookup(label_id);
+}
+
 bool Let::typecheck(Type* lType, Type* rType){
  /* is rType compatible for assignment with lType? */
 	// same types are compatible
@@ -351,7 +359,7 @@ void StmtList::sem(){
 }
 
 void LabelDecl::sem(){
-	st.insert(id,LABEL::getInstance());
+	st.insert_label(id);
 }
 
 void VarDecl::sem(){

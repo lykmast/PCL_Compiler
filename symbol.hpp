@@ -9,6 +9,7 @@ Contains symbol table and symbol entities
 #include <cstdlib>
 #include <map>
 #include <vector>
+#include <set>
 #include <string>
 #include "ast.hpp"
 
@@ -63,10 +64,26 @@ public:
 		insert(name, t);
 	}
 
+	void insert_label(std::string lbl){
+		if(labels.find(lbl)!=labels.end()){
+			std::cerr << "Label " << lbl << " already declared in this scope."
+				<< std::endl;
+			exit(1);
+		}
+		labels.insert(lbl);
+	}
+
+	void label_lookup(std::string lbl){
+		if(labels.find(lbl)==labels.end()){
+			std::cerr << "Label " << lbl << " already declared in this scope."
+				<< std::endl;
+			exit(1);
+		}
 	}
 private:
 	std::map<std::string, SymbolEntry> locals;
 	std::map<std::string, FunctionEntry> functions;
+	std::set<std::string> labels;
 	FunctionEntry* thisFunction;
 };
 
@@ -121,6 +138,14 @@ public:
 	FunctionEntry *function_decl_lookup(std::string name) {
 		FunctionEntry* e = scopes.back().function_lookup(name);
 		return e;
+	}
+
+	void insert_label(std::string lbl){
+		scopes.back().insert_label(lbl);
+	}
+
+	void label_lookup(std::string lbl){
+		scopes.back().label_lookup(lbl);
 	}
 
 	void insert(std::string name, Type* t) { scopes.back().insert(name, t); }
