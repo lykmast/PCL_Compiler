@@ -63,7 +63,7 @@ void Op::printOn(std::ostream &out) const {
 	else  out << op << "(" << *left << ")";
 }
 
-Reference::Reference(LValue* lval):lvalue(lval){}
+Reference::Reference(LValue* lval):lvalue(lval), count(0){}
 void Reference::printOn(std::ostream &out) const {
 	out << "Reference" << "(" << *lvalue << ")";
 }
@@ -72,7 +72,7 @@ void Reference::printOn(std::ostream &out) const {
 
 
 
-Dereference::Dereference(Expr *e):expr(e){}
+Dereference::Dereference(Expr *e):expr(e), count(0){}
 void Dereference::printOn(std::ostream &out) const {
 	out << "Dereference" << "(" << *expr << ")";
 }

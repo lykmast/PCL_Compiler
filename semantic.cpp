@@ -122,10 +122,21 @@ void Op::sem(){
 }
 
 void Reference::sem(){
+	count=-1;
+	if(Expr* e=lvalue->simplify(count)){
+		delete lvalue;
+		lvalue=static_cast<LValue*>(e);
+	}
 	lvalue->sem();
 }
 
+
 void Dereference::sem(){
+	count=1;
+	if(Expr* e=expr->simplify(count)){
+		delete expr;
+		expr=e;
+	}
 	expr->sem();
 	Type* ty=expr->get_type();
 	if(ty->get_name().compare("pointer")){
@@ -133,6 +144,28 @@ void Dereference::sem(){
 		std::cerr << "ERROR: Can only dereference pointer (not "<<
 		ty->get_name()<<")" <<std::endl;
 	}
+}
+
+Expr* Reference::simplify(int &count){
+	count=count-1;
+	LValue* tmp=lvalue;
+	lvalue=nullptr;
+	if(Expr* e= tmp->simplify(count)){
+		delete tmp;
+		return e;
+	}
+	return tmp;
+}
+
+Expr* Dereference::simplify(int &count){
+	count=count+1;
+	Expr* tmp=expr;
+	expr=nullptr;
+	if(Expr* e= tmp->simplify(count)){
+		delete tmp;
+		return e;
+	}
+	return tmp;
 }
 
 void Brackets::sem(){

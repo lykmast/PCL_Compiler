@@ -63,7 +63,6 @@ protected:
 	std::string name;
 };
 
-
 class LABEL: public Type{
 private:
 	LABEL():Type("label"){}  //private constructor to prevent instancing
@@ -324,37 +323,49 @@ private:
 class Reference: public Expr{
 public:
 	Reference(LValue* lval);
+
 	virtual void printOn(std::ostream &out) const override;
 
 	virtual void sem() override;
 
 	virtual Type* get_type() override;
 
+	LValue* get_lvalue(){ return lvalue;}
 
+	Expr* simplify(int &count);
 protected:
 	LValue* lvalue;
+	int count;
 };
 
 class Dereference: public LValue{
 public:
 	Dereference(Expr *e);
+
 	virtual void printOn(std::ostream &out) const override;
+
 	virtual void sem() override;
 
 	virtual Type* get_type() override;
 
+	Expr* get_expr(){ return expr;}
 
+	Expr* simplify(int &count);
 
 protected:
 	Expr *expr;
+	int count;
 };
 
 
 class Brackets: public LValue{
 public:
 	Brackets(LValue *lval, Expr* e);
+
 	virtual void printOn(std::ostream &out) const override;
+
 	virtual void sem() override;
+
 	virtual Type* get_type() override;
 protected:
 	LValue* element();
