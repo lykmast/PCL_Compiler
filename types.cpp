@@ -76,10 +76,14 @@ void ArrType::printOn(std::ostream &out) const {
 	out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
 }
 
+bool ArrType::is_1D(){
+	return type->get_name().compare("array");
+}
 
 
-CallableType::CallableType(std::string func_type, std::vector<Type*> formalTs, std::vector<bool> ref):
-	Type(func_type), formal_types(formalTs), by_ref(ref){}
+CallableType::CallableType(std::string func_type, FormalDeclList* formals):
+	Type(func_type), formal_types(formals->get_type()),
+	formal_vars(formals->get_names()), by_ref(formals->get_by_ref()){}
 
 bool CallableType::should_delete() const{
 	return true;
@@ -131,21 +135,27 @@ std::vector<std::string> CallableType::get_outer_vars(){
 	return outer_vars;
 }
 
-void CallableType::add_outer(std::string name){
+std::vector<std::string> CallableType::get_formal_vars(){
+	return formal_vars;
+}
+
+void CallableType::add_outer(Type*t, std::string name){
 	// variable that belongs to outer scope is add as implicit
 	//   argument passed by reference
 	outer_vars.push_back(name);
+	outer_types.push_back(t);
 }
 
-FunctionType::FunctionType( Type* ret_ty ,std::vector<Type*> formalTs, std::vector<bool> ref):
-	CallableType("function", formalTs, ref),ret_type(ret_ty){}
+
+FunctionType::FunctionType( Type* ret_ty , FormalDeclList* formals):
+	CallableType("function", formals),ret_type(ret_ty){}
 
 Type* FunctionType::get_ret_type(){
 	return ret_type->clone();
 }
 
-ProcedureType::ProcedureType(std::vector<Type*> formalTs, std::vector<bool> ref):
-	CallableType("procedure", formalTs, ref){}
+ProcedureType::ProcedureType(FormalDeclList* formals):
+	CallableType("procedure", formals){}
 
 Type* Const::get_type(){return type->clone();}
 

@@ -210,7 +210,8 @@ void Body::printOn(std::ostream &out) const {
 }
 
 Procedure::Procedure(std::string name, DeclList *decl_list, Body* bod, std::string decl_type):
-	Decl(name,decl_type), body(bod),formals(static_cast<FormalDeclList*>(decl_list)){}
+	Decl(name,decl_type), body(bod),
+	formals(static_cast<FormalDeclList*>(decl_list)), type(nullptr){}
 void Procedure::printOn(std::ostream &out) const {
 	if(body)
 		out << decl_type<<"("<<*formals<<",,,"<<*body<<")";

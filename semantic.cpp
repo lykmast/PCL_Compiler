@@ -417,12 +417,16 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 		// this is only subprogram header
 		CallableType *subp_type;
 		if(isFunction){
-			subp_type=new FunctionType(ret_type, formal_types, by_ref);
+			subp_type=new FunctionType(ret_type, formals);
 		}
 		else{
-			subp_type=new ProcedureType(formal_types, by_ref);
+			subp_type=new ProcedureType(formals);
 		}
 		st.insert_function(id,subp_type,body);
+		if(body->isLibrary()){
+			// library subprogram; setup type
+			type=subp_type;
+		}
 		// no body to sem; return.
 		return;
 	}
@@ -435,12 +439,13 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 	else{ // first declaration of this subprogram
 		CallableType *subp_type;
 		if(isFunction){
-			subp_type=new FunctionType(ret_type, formal_types, by_ref);
+			subp_type=new FunctionType(ret_type, formals);
 		}
 		else{
-			subp_type=new ProcedureType(formal_types, by_ref);
+			subp_type=new ProcedureType(formals);
 		}
 		st.insert_function(id,subp_type,body);
+		type=subp_type;
 	}
 
 	// valid subprogram with body
@@ -564,4 +569,14 @@ std::vector<bool> FormalDeclList::get_by_ref(){
 		by_ref.push_back(f->isByRef());
 	}
 	return by_ref;
+}
+
+std::vector<std::string> FormalDeclList::get_names(){
+ /*return passing mode of each parameter in a vector*/
+	std::vector<std::string> names;
+	for(auto p=list.begin();p!=list.end();p++){
+		FormalDecl* f=static_cast<FormalDecl*>(*p);
+		names.push_back(f->get_id());
+	}
+	return names;
 }

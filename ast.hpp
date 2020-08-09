@@ -10,7 +10,18 @@ Contains class declarations for AST and all
 #include <string>
 #include <cstring>
 #include "pcl_lexer.hpp"
-
+// --------LLVM includes---------
+#include "llvm/ADT/APFloat.h"
+#include "llvm/IR/BasicBlock.h"
+#include "llvm/IR/Constants.h"
+#include "llvm/IR/DerivedTypes.h"
+#include "llvm/IR/Function.h"
+#include "llvm/IR/IRBuilder.h"
+#include "llvm/IR/LLVMContext.h"
+#include "llvm/IR/Module.h"
+#include "llvm/IR/Type.h"
+#include "llvm/IR/Verifier.h"
+#include <llvm/IR/Value.h>
 
 class LValue;
 struct FunctionEntry;
@@ -59,6 +70,8 @@ public:
 
 	virtual bool doCompare(Type* t);
 
+	virtual llvm::Type* cgen(){return nullptr;}
+
 protected:
 	std::string name;
 };
@@ -82,6 +95,8 @@ public:
 		return &instance;
 	}
 
+	virtual llvm::Type* cgen() override;
+
 };
 
 class REAL: public Type{
@@ -92,6 +107,7 @@ public:
 		static REAL instance;
 		return &instance;
 	}
+	virtual llvm::Type* cgen() override;
 };
 
 class BOOLEAN: public Type{
@@ -102,6 +118,7 @@ public:
 		static BOOLEAN instance;
 		return &instance;
 	}
+	virtual llvm::Type* cgen() override;
 };
 
 class CHARACTER: public Type{
@@ -112,6 +129,7 @@ public:
 		static CHARACTER instance;
 		return &instance;
 	}
+	virtual llvm::Type* cgen() override;
 };
 
 class ANY: public Type{
@@ -122,6 +140,7 @@ public:
 		static ANY instance;
 		return &instance;
 	}
+	virtual llvm::Type* cgen() override;
 };
 
 
@@ -131,7 +150,7 @@ public:
 	PtrType(std::string name,Type* t);
 	~PtrType();
 
-	virtual Type* clone();
+	virtual Type* clone() override;
 
 	Type* get_type();
 
@@ -141,6 +160,7 @@ public:
 
 	virtual bool doCompare(Type* t) override;
 
+	virtual llvm::Type* cgen() override;
 protected:
 	Type* type;
 };
@@ -151,22 +171,23 @@ public:
 	ArrType(int s,Type* t);
 	ArrType(Type* t);
 
-	virtual Type* clone();
-
+	virtual Type* clone() override;
 
 	int get_size();
 
 	virtual bool doCompare(Type* t) override;
 
 	virtual void printOn(std::ostream &out) const override;
-
+	bool is_1D();
+	virtual llvm::Type* cgen() override;
 protected:
 	int size;
 };
 
+class FormalDeclList;
 class CallableType: public Type{
 public:
-	CallableType(std::string func_type, std::vector<Type*> formalTs, std::vector<bool> ref);
+	CallableType(std::string func_type, FormalDeclList* formals);
 	virtual bool should_delete() const override;
 	void typecheck_args(std::vector<Type*> arg_types);
 
@@ -179,32 +200,41 @@ public:
 
 	std::vector<std::string> get_outer_vars();
 
-	void add_outer(std::string name);
+	void add_outer(Type *t, std::string name);
+
+	std::vector<std::string> get_formal_vars();
 
 protected:
 	std::vector<Type*> formal_types;
+	std::vector<std::string> formal_vars;
 	std::vector<bool> by_ref;
 	std::vector<std::string> outer_vars;
+	std::vector<Type*> outer_types;
+	std::vector<llvm::Type*> cgen_argTypes();
 };
 
 class FunctionType: public CallableType{
 public:
-	FunctionType( Type* ret_ty ,std::vector<Type*> formalTs, std::vector<bool> ref);
+	FunctionType( Type* ret_ty , FormalDeclList* formals);
 	Type* get_ret_type();
+	virtual llvm::Type* cgen() override;
 private:
 	Type* ret_type;
 };
 
 class ProcedureType: public CallableType{
 public:
-	ProcedureType(std::vector<Type*> formalTs, std::vector<bool> ref);
+	ProcedureType(FormalDeclList* formals);
+	virtual llvm::Type* cgen() override;
 };
 
 class Const;
 class Expr: public AST {
 public:
 	virtual Type* get_type()=0;
+	virtual llvm::Value* cgen()=0;
 	virtual bool isLValue() const{return false;}
+	virtual Expr* simplify(int count) {return nullptr;}
 };
 
 class Stmt: virtual public AST {
@@ -212,6 +242,7 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Stmt()";
 	}
+	virtual void cgen(){}
 	virtual bool isReturn(){return false;}
 };
 
@@ -221,6 +252,7 @@ public:
 		out << "Return";
 	}
 	virtual bool isReturn() override{return true;}
+	virtual void cgen() override;
 };
 
 class Const: public Expr{
@@ -237,6 +269,7 @@ public:
 	LValue(bool dyn=false):dynamic(dyn){}
 	bool isDynamic(){return dynamic;}
 	virtual bool isLValue() const override{return true;}
+	virtual llvm::Value* getAddr()=0;
 protected:
 	bool dynamic;
 };
@@ -246,6 +279,7 @@ class Rconst: public Const {
 public:
 	Rconst(double n);
 	virtual void printOn(std::ostream &out) const override;
+	virtual llvm::Value* cgen() override;
 private:
 	double num;
 };
@@ -255,6 +289,7 @@ class Iconst: public Const {
 public:
 	Iconst(int n);
 	virtual void printOn(std::ostream &out) const override;
+	virtual llvm::Value* cgen() override;
 private:
 	int num;
 };
@@ -263,6 +298,7 @@ class Cconst: public Const {
 public:
 	Cconst(char c);
 	virtual void printOn(std::ostream &out) const override ;
+	virtual llvm::Value* cgen() override;
 private:
 	char ch;
 };
@@ -272,12 +308,15 @@ public:
 	NilConst();
 
 	virtual void printOn(std::ostream &out) const override;
+	virtual llvm::Value* cgen() override;
 };
 
 class Sconst: public LValue{
 public:
 	Sconst(std::string s);
 	virtual void printOn(std::ostream &out) const override;
+	virtual llvm::Value* cgen() override;
+	virtual llvm::Value* getAddr() override;
 	virtual Type* get_type() override;
 private:
 	std::string str;
@@ -289,10 +328,12 @@ public:
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
 	virtual Type* get_type() override;
+	virtual llvm::Value* getAddr() override;
 private:
 	std::string name;
 	Type* type;
 
+	virtual llvm::Value* cgen() override;
 };
 
 
@@ -300,6 +341,7 @@ class Bconst: public Const {
 public:
 	Bconst(bool b);
 	virtual void printOn(std::ostream &out) const override;
+	virtual llvm::Value* cgen() override;
 private:
 	bool boo;
 };
@@ -312,6 +354,7 @@ public:
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
 	virtual Type* get_type() override;
+	virtual llvm::Value* cgen() override;
 
 private:
 	Expr *left;
@@ -333,6 +376,8 @@ public:
 	LValue* get_lvalue(){ return lvalue;}
 
 	Expr* simplify(int &count);
+
+	virtual llvm::Value* cgen() override;
 protected:
 	LValue* lvalue;
 	int count;
@@ -352,6 +397,9 @@ public:
 
 	Expr* simplify(int &count);
 
+	virtual llvm::Value* cgen() override;
+
+	virtual llvm::Value* getAddr() override;
 protected:
 	Expr *expr;
 	int count;
@@ -367,6 +415,10 @@ public:
 	virtual void sem() override;
 
 	virtual Type* get_type() override;
+
+	virtual llvm::Value* cgen() override;
+
+	virtual llvm::Value* getAddr() override;
 protected:
 	LValue* element();
 	LValue* lvalue;
@@ -379,6 +431,7 @@ public:
 	~Let();
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
+	virtual void cgen() override;
 	static bool typecheck(Type* lType, Type* rType);
 	static char parse_as(Type *t);
 protected:
@@ -393,6 +446,7 @@ public:
 	If(Expr* e,Stmt* s1, Stmt* s2);
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
+	virtual void cgen() override;
 private:
 	Expr *expr;
 	Stmt *stmt1,*stmt2;
@@ -404,6 +458,7 @@ public:
 	While(Expr* e,Stmt* s);
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
+	virtual void cgen() override;
 private:
 	Expr *expr;
 	Stmt *stmt;
@@ -415,6 +470,7 @@ public:
 	~New();
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
+	virtual void cgen() override;
 protected:
 	Expr* expr;
 	LValue* lvalue;
@@ -427,6 +483,7 @@ public:
 	~Dispose();
 	virtual void sem() override;
 	virtual void printOn(std::ostream &out) const override;
+	virtual void cgen() override;
 protected:
 	LValue *lvalue;
 };
@@ -438,6 +495,7 @@ public:
 	~DisposeArr();
 	virtual void sem() override;
 	virtual void printOn(std::ostream &out) const override;
+	virtual void cgen() override;
 protected:
 	LValue *lvalue;
 };
@@ -488,6 +546,7 @@ public:
 	StmtList();
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
+	virtual void cgen() override;
 };
 
 class ExprList: public List<Expr> {
@@ -498,6 +557,7 @@ public:
 
 	std::vector<Type*> get_type();
 
+	virtual std::vector<llvm::Value*> cgen(std::vector<bool> by_ref);
 };
 
 class Decl: public AST{
@@ -509,6 +569,7 @@ public:
 	}
 	virtual Type* get_type(){return nullptr;}
 	std::string get_id(){return id;}
+	virtual void cgen(){}
 protected:
 	std::string id;
 	std::string decl_type;
@@ -529,6 +590,7 @@ public:
 	virtual void printOn(std::ostream &out) const override;
 	virtual Type* get_type() override;
 	virtual void sem() override;
+	virtual void cgen() override;
 
 protected:
 	Type* type;
@@ -554,11 +616,13 @@ public:
 	void toLabel();
 	void toFormal(Type* t, bool ref);
 	std::vector<Type*> get_type();
+	virtual void cgen();
 };
 
 class FormalDeclList: public DeclList{
 public:
 	std::vector<bool> get_by_ref();
+	std::vector<std::string> get_names();
 };
 
 class Call;
@@ -577,6 +641,7 @@ public:
 
 	virtual void printOn(std::ostream &out) const override ;
 
+	void cgen();
 protected:
 	DeclList* declarations;
 	StmtList* statements;
@@ -588,13 +653,19 @@ class Procedure:public Decl{
 public:
 	Procedure(std::string name, DeclList *decl_list,
 		Body* bod, std::string decl_type="procedure");
+
 	virtual void printOn(std::ostream &out) const override;
+
 	void add_body(Body* bod);
+
 	virtual void sem() override;
+
+	virtual void cgen() override;
 protected:
 	void sem_helper(bool isFunction=false, Type* ret_type=nullptr);
 	Body* body;
 	FormalDeclList* formals;
+	CallableType* type;
 };
 
 class Function:public Procedure{
@@ -609,9 +680,12 @@ protected:
 class Program: public AST{
 public:
 	Program(std::string nam, Body* bod);
+
 	virtual void printOn(std::ostream &out) const override;
 
 	virtual void sem() override;
+
+	void cgen();
 private:
 	std::string name;
 	Body* body;
@@ -631,6 +705,7 @@ protected:
 
 	void add_outer();
 
+	llvm::Value* cgen_common();
 };
 
 class ProcCall: public Call, public Stmt{
@@ -638,6 +713,7 @@ public:
 	ProcCall(std::string nam, ExprList* exp);
 	virtual void sem() override;
 	virtual void printOn(std::ostream &out) const override;
+	virtual void cgen() override;
 };
 
 class FunctionCall: public Call, public Expr{
@@ -647,6 +723,8 @@ public:
 	virtual Type* get_type() override;
 
 	virtual void printOn(std::ostream &out) const override ;
+
+	virtual llvm::Value* cgen() override;
 private:
 	Type* type;
 };

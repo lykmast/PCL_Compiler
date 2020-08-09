@@ -102,6 +102,7 @@ program:
 	     /* std::cout<<"before sem: "<<*$$<<std::endl;
 	    std::cout<<"after sem: "<<*$$<<std::endl;
 	    // fflush(stdin); */
+	    $$->cgen();}
 ;
 
 // {std::cout << "AST: " << *$4 << std::endl; $$ = new Program($4);std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();
