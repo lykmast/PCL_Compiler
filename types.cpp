@@ -11,8 +11,6 @@ std::string Type::get_name(){
 	return name;
 }
 
-UnnamedLValue* Type::create() const{return nullptr;}
-
 void Type::printOn(std::ostream &out) const{
 	out << "Type(" << name << ")";
 }
@@ -150,8 +148,9 @@ ProcedureType::ProcedureType(std::vector<Type*> formalTs, std::vector<bool> ref)
 	CallableType("procedure", formalTs, ref){}
 
 Type* Const::get_type(){return type->clone();}
-Type* UnnamedLValue::get_type(){
-	return type->clone();
+
+Type* Sconst::get_type(){
+	return new ArrType(str.size()+1, CHARACTER::getInstance());
 }
 Type* Id::get_type(){
 	return type->clone();
@@ -194,17 +193,4 @@ std::vector<Type*> ExprList::get_type(){
 		ret.push_back(p->get_type());
 	}
 	return ret;
-}
-
-
-Const* Const::copyToType() const {return nullptr;}
-Const* Iconst::copyToType() const{
-	return new Rconst(num*1.0);
-}
-Const* Pconst::copyToType() const{
-	Type* temp=static_cast<PtrType*>(type)->get_type();
-	ArrType* arrType=static_cast<ArrType*>(temp);
-	Type* inType=arrType->get_type();
-
-	return new Pconst(ptr,new PtrType(ArrType(inType)));
 }

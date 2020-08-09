@@ -12,22 +12,6 @@ Const::~Const(){
 			delete type;
 }
 
-
-UnnamedLValue::UnnamedLValue(Type *ty,bool dyn):LValue(dyn),type(ty){}
-UnnamedLValue::UnnamedLValue(value val, Type* ty,bool dyn):LValue(dyn),val(val),type(ty){}
-UnnamedLValue::~UnnamedLValue(){
-	if(type)
-		if(type->should_delete())
-			delete type;
-}
-void UnnamedLValue::printOn(std::ostream &out) const{
-	if(type)
-		out << "UnnamedLValue(" << val.lval<<","<<*type << ")";
-	else
-		out << "UnnamedLValue(EMPTY)";
-}
-
-
 Rconst::Rconst(double n):Const(REAL::getInstance() ),num(n){}
 void Rconst::printOn(std::ostream &out) const{
 	out << "Rconst(" << num << ")";
@@ -43,85 +27,19 @@ void Cconst::printOn(std::ostream &out) const {
 	out << "Cconst(" << ch << ")";
 }
 
-Pconst::Pconst():Const(new PtrType(ANY::getInstance())),ptr(nullptr){}//TODO implement for pointers different than nil
-Pconst::Pconst(LValue* pval,Type *t):Const(new PtrType(t) ),ptr(pval){}
-void Pconst::printOn(std::ostream &out) const {
-	out << "Pconst(" << ptr << "of type "<<*type<< ")";
-	if(ptr)
-		out<<"->"<<*ptr;
-	else
-		out<<"->nil";
+NilConst::NilConst():Const(new PtrType(ANY::getInstance())){}
+void NilConst::printOn(std::ostream &out) const {
+	out << "NilConst("<<*type<< ")";
 }
 
-
-StaticArray::StaticArray(int s, Type* t, int o):Arrconst(s,t), offset(o){
-	child_size=find_child_size(t);
-
-	if(!t->get_name().compare("array")){
-		ArrType* arrT=static_cast<ArrType*>(t);
-		if(arrT->get_size()>0){
-			for(int i=0; i<s; i++){
-				rt_stack[offset+i*child_size]= new StaticArray(
-					arrT->get_size(),
-					arrT->get_type(),
-					offset+i*child_size+1
-				);
-			}
-		}
-	}
-}
-void StaticArray::printOn(std::ostream &out) const{
-	out << "StaticArray( ["<<size<<"]"<<"of type "<< *type << ")";
-}
-int StaticArray::find_child_size(Type* t){
-	if(!t->get_name().compare("array")){
-		ArrType* arrT=static_cast<ArrType*>(t);
-		int children=arrT->get_size();
-		if(children>0){
-			return children*find_child_size(arrT->get_type())+1;
-		}
-	}
-	return 1;
+Sconst::Sconst(std::string s):str(s){}
+void Sconst::printOn(std::ostream &out) const {
+	out<< "Sconst("<<str<<")";
 }
 
-
-DynamicArray::DynamicArray(int s, Type* t):Arrconst(s,t){
-	if(s<0){
-		/*TODO error wrong value*/
-		std::cerr<<"ERROR: "<< s <<" is bad size for array!"<<std::endl;
-		exit(1);
-	}
-	arr.resize(s);
-	for(int i=0;i<s;i++){
-		arr[i]=t->create();
-	}
-}
-DynamicArray::~DynamicArray(){
-	for (auto p:arr)
-		delete p;
-}
-DynamicArray::DynamicArray(std::string s):
-		Arrconst(s.size()+1,CHARACTER::getInstance()) {
-	char* str=(char*)(malloc(sizeof(char)*(s.size()+1)));
-	s.copy(str,s.size()); //to char[]
-	str[s.size()]='\0';
-	arr.resize(s.size()+1);
-	for(uint i=0;i<s.size()+1;i++){
-		arr[i]=CHARACTER::getInstance()->create();
-	}
-	for(int i=0; i<size;i++){
-		value v; v.c=str[i];
-		arr[i]->let(v);
-	}
-}
-void DynamicArray::printOn(std::ostream &out) const{
-	out << "DynamicArray([" << arr <<"] ["<<size<<"]"<<"of type "<< *type << ")";
-}
-
-
-Id::Id(std::string v): name(v), offset(-1), decl_nesting(0), current_nesting(0), type(nullptr) {}
+Id::Id(std::string v): name(v), type(nullptr) {}
 void Id::printOn(std::ostream &out) const {
-	out << "Id(" << name <<"@"<<offset<<":"<<decl_nesting<<")";
+	out << "Id(" << name <<")";
 }
 
 
@@ -282,10 +200,10 @@ void DeclList::toFormal(Type* t, bool ref){
 }
 
 
-Body::Body():declarations(nullptr),statements(nullptr),size(0),
-	defined(false),calls(){}
+Body::Body(bool library):declarations(nullptr),statements(nullptr),
+	defined(false), library(library){}
 Body::Body(DeclList* d, StmtList* s):declarations(d),statements(s),
-	size(0),defined(true),calls(){}
+	defined(true), library(false){}
 Body::~Body(){delete declarations; delete statements;}
 void Body::printOn(std::ostream &out) const {
 	out << "Body("<<*declarations<<","<<*statements<<")";
@@ -303,15 +221,14 @@ void Procedure::printOn(std::ostream &out) const {
 Function::Function(std::string name, DeclList *decl_list, Type* return_type, Body* bod)
 	:Procedure(name,decl_list,bod,"function"), ret_type(return_type){}
 
-Program::Program(std::string nam, Body* bod):name(nam),body(bod),size(0){}
+Program::Program(std::string nam, Body* bod):name(nam),body(bod){}
 void Program::printOn(std::ostream &out) const {
 	out << "Program(" << name <<" ::: "<<*body<< ")";
 }
 
 
 Call::Call(std::string nam, ExprList* exp): name(nam), exprs(exp),
-	by_ref(exp->size()), outer_vars(new ExprList()), nesting_diff(0), next_fp_offset(0),
-	body(nullptr){}
+	by_ref(exp->size()), outer_vars(new ExprList()), body(nullptr){}
 
 ProcCall::ProcCall(std::string nam, ExprList* exp):Call(nam, exp){}
 void ProcCall::printOn(std::ostream &out) const {

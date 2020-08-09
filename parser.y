@@ -10,8 +10,6 @@ Syntax parser for pcl compiler in bison.
 #include <string>
 #include <vector>
 
-std::vector<UnnamedLValue*> rt_stack;
-unsigned long fp;
 %}
 
 %define parse.error verbose
@@ -104,7 +102,6 @@ program:
 	     /* std::cout<<"before sem: "<<*$$<<std::endl;
 	    std::cout<<"after sem: "<<*$$<<std::endl;
 	    // fflush(stdin); */
-	    $$->run();}
 ;
 
 // {std::cout << "AST: " << *$4 << std::endl; $$ = new Program($4);std::cout<<"between sem and run"<<std::endl; std::cout << "AST: " << *$4 << std::endl; $4->run();
@@ -208,7 +205,7 @@ expr:
 l_value_ref:
   T_id {$$ = new Id(*$1);}
 | "result" {$$ = new Id("result");}
-| T_sconst {$$ = new DynamicArray(*$1);}
+| T_sconst {$$ = new Sconst(*$1);}
 | l_value_ref '[' expr ']' %prec BRACKETS {$$ = new Brackets($1,$3);}
 | '(' l_value ')' {$$ = $2;}
 
@@ -216,7 +213,7 @@ l_value:
   expr '^' {$$ = new Dereference($1);}
 | T_id {$$ = new Id(*$1);}
 | "result" {$$ = new Id("result");}
-| T_sconst {$$ = new DynamicArray(*$1);}
+| T_sconst {$$ = new Sconst(*$1);}
 | l_value '[' expr ']' %prec BRACKETS {$$ = new Brackets($1,$3);}
 | '(' l_value ')'{$$ = $2;}
 ;
@@ -228,7 +225,7 @@ r_value:
 | "true" {$$ = new Bconst(true);}
 | "false" {$$ = new Bconst(false);}
 | '(' r_value ')' {$$ = $2;}
-| "nil" {$$ = new Pconst(); /*pointer constant*/}
+| "nil" {$$ = new NilConst(); /*pointer constant*/}
 | fun_call {$$ = $1;}
 | '@' l_value_ref {$$ = new Reference($2);}
 | expr '+' expr {$$ = new Op($1,"+",$3);}

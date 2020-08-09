@@ -16,28 +16,22 @@ Contains symbol table and symbol entities
 
 struct SymbolEntry {
 	Type* type;
-	int offset;
-	int nesting;
 	SymbolEntry() {}
-	SymbolEntry(Type* t, int ofs, int nest) : type(t), offset(ofs), nesting(nest) {}
+	SymbolEntry(Type* t) : type(t) {}
 };
 
 struct FunctionEntry {
 	CallableType* type;
-	int nesting;
 	Body* body;
 	FunctionEntry() {}
-	FunctionEntry(CallableType* t, int nest, Body* bod) : type(t), nesting(nest), body(bod) {}
+	FunctionEntry(CallableType* t, Body* bod) : type(t), body(bod) {}
 };
 
 class Scope {
 public:
-	Scope() : locals(), thisFunction(nullptr), offset(0), size(0), nesting(1) {}
-	Scope(int nest, FunctionEntry *e) :
-		locals(), thisFunction(e), offset(0), size(0), nesting(nest) {}
-	int getOffset() const { return offset; }
-	int getNesting() const { return nesting; }
-	int getSize() const { return size; }
+	Scope() : locals(), thisFunction(nullptr){}
+	Scope(FunctionEntry *e) :
+		locals(), thisFunction(e) {}
 	FunctionEntry* getParent() const{return thisFunction;}
 	SymbolEntry *lookup(std::string name) {
 		if (locals.find(name) == locals.end()) return nullptr;
@@ -47,14 +41,12 @@ public:
 		if (functions.find(name) == functions.end()) return nullptr;
 		return &(functions[name]);
 	}
-	void insert(std::string name, Type* t, int s) {
+	void insert(std::string name, Type* t) {
 		if (locals.find(name) != locals.end()) {
 			std::cerr << "Duplicate variable " << name << std::endl;
 			exit(1);
 		}
-		locals[name] = SymbolEntry(t, offset, nesting);
-		offset+=s;
-		size+=s;
+		locals[name] = SymbolEntry(t);
 	}
 	void insert_function(std::string name, CallableType* t, Body* bod) {
 		if (functions.find(name) != functions.end()) {
@@ -63,30 +55,28 @@ public:
 				exit(1);
 			}
 		}
-		functions[name] = FunctionEntry(t, nesting, bod);
+		functions[name] = FunctionEntry(t, bod);
 	}
 
 	void add_outer(Type* t, std::string name){
-		thisFunction->type->add_outer(name);
-		insert(name, t, 1);
+		thisFunction->type->add_outer(t,name);
+		insert(name, t);
+	}
+
 	}
 private:
 	std::map<std::string, SymbolEntry> locals;
 	std::map<std::string, FunctionEntry> functions;
 	FunctionEntry* thisFunction;
-	int offset;
-	int size;
-	int nesting;
 };
 
 
 class SymbolTable {
 public:
 	void openScope(std::string name) {
-		int nest = scopes.empty() ? 0 : scopes.back().getNesting();
 		if (!scopes.empty()){
 			FunctionEntry *e = function_lookup(name);
-			scopes.push_back(Scope(nest+1,e));
+			scopes.push_back(Scope(e));
 		}
 		else{
 			scopes.push_back(Scope());
@@ -133,10 +123,8 @@ public:
 		return e;
 	}
 
-	int getSizeOfCurrentScope() const { return scopes.back().getSize(); }
-	void insert(std::string name, Type* t, int size=1) { scopes.back().insert(name, t, size); }
+	void insert(std::string name, Type* t) { scopes.back().insert(name, t); }
 	void insert_function(std::string name, CallableType* t, Body* bod) { scopes.back().insert_function(name, t, bod); }
-	int getNestingOfCurrentScope() const{ return scopes.back().getNesting();}
 	FunctionEntry *getParentOfCurrentScope() const {return scopes.back().getParent();}
 private:
 	std::vector<Scope> scopes;

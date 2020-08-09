@@ -15,9 +15,6 @@ void Id::sem(){
 		exit(1);
 	}
 	type = e->type;
-	offset = e->offset;
-	decl_nesting = e->nesting; // nesting level of declaration
-	current_nesting=st.getNestingOfCurrentScope(); // nesting level of use
 }
 
 void Op::sem(){
@@ -326,26 +323,7 @@ void LabelDecl::sem(){
 
 void VarDecl::sem(){
 	// insert variable to symbol table
-	int s=get_sizeof(type);
-	st.insert(id,type,s);
-}
-
-int VarDecl::get_sizeof(Type* t){
-	// find size of variable in stack
-	//   (it is different only for static arrays)
-	if(!t->get_name().compare("array")){
-		// t is ArrType
-		ArrType* arr_type=static_cast<ArrType*>(t);
-		int s=arr_type->get_size();
-		if(s>0){
-			// declared arrays of FIXED size should
-			//   take more space in stack
-			Type* inside=arr_type->get_type();
-			return s*get_sizeof(inside)+1;
-		}
-	}
-	// non static-array types have size 1 in stack
-	return 1;
+	st.insert(id,type);
 }
 
 void DeclList::sem(){
@@ -360,14 +338,6 @@ void Body::sem(){
 	}
 	declarations->sem();
 	statements->sem();
-	// finally add correct size on calls
-	//    (correct size cannot be known from declarations->sem
-	//     because of outer variables)
-	for(Call *c:calls){
-		// +1 is to account for saving old fp in stack frame of parent
-		c->add_next_fp_offset(st.getSizeOfCurrentScope()+1);
-	}
-	size = st.getSizeOfCurrentScope();
 }
 
 void Procedure::sem_helper(bool isFunction, Type* ret_type){
@@ -443,7 +413,7 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 	// valid subprogram with body
 	st.openScope(id);
 	if(isFunction){
-		// declare result of function as first local of function (offset 1 from fp)
+		// declare result of function as first local of function.
 		VarDecl v(new Decl("result","var"),ret_type); v.sem();
 	}
 	formals->sem();
@@ -466,7 +436,6 @@ void Program::sem(){
 		p->sem();
 	}
 	body->sem();
-	size=st.getSizeOfCurrentScope();
 	st.closeScope();
 	inp=fopen("pascal_input.inp", "r");
 }
@@ -486,9 +455,6 @@ void FunctionCall::sem(){
 		exit(1);
 	}
 	type=static_cast<FunctionType*>(e->type)->get_ret_type();
-}
-void Call::add_next_fp_offset(int ofs){
-	next_fp_offset=ofs;
 }
 
 FunctionEntry* Call::check_passing(){
@@ -533,18 +499,6 @@ FunctionEntry* Call::check_passing(){
 		Expr* i = new Id(name); i->sem();
 		outer_vars->append(i);
 	}
-
-	nesting_diff=st.getNestingOfCurrentScope()-e->nesting;
-	if(st.getNestingOfCurrentScope()==1){
-		//parent is program, so does not have implicit arguments
-		next_fp_offset=st.getSizeOfCurrentScope()+1;
-	}
-	else{
-		st.getParentOfCurrentScope()->body->add_call(this);
-		// next_fp_offset will be add from parent Body
-		//    to account for implicit arguments in the stack frame of parent
-		// next_fp_offset=st.getSizeOfCurrentScope()+1;
-	}
 	return e;
 
 }
@@ -554,10 +508,6 @@ void Body::add_body(Body *b){
 	defined=true;
 	declarations=b->declarations;
 	statements=b->statements;
-}
-
-void Body::add_call(Call *c){
-	calls.push_back(c);
 }
 
 bool Body::isDefined(){
