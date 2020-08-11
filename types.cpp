@@ -198,7 +198,7 @@ std::vector<Type*> DeclList::get_type(){
 	return types;
 }
 std::vector<Type*> ExprList::get_type(){
-	std::vector<Type*> ret(list.size());
+	std::vector<Type*> ret;
 	for(auto p:list){
 		ret.push_back(p->get_type());
 	}
