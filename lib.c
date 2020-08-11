@@ -1,7 +1,8 @@
-#include "cstdint"
-#include "cstdio"
-#include "cstring"
+#include "stdint.h"
+#include "stdio.h"
 #include "math.h"
+#include "string.h"
+#include "stdlib.h"
 
 void writeInteger(int32_t i){
 	printf("%d",i);
@@ -19,7 +20,7 @@ void writeReal(double r){
 	printf("%lf",r);
 }
 
-void writeString(uint8_t *s){
+void writeString(uint8_t s[]){
 	printf("%s",s );
 }
 
@@ -44,10 +45,10 @@ uint8_t readBoolean(){
 	}
 	word[strlen(word)-1]='\0';
 	if(!strcmp(word,"true")){
-		b=true;
+		b=1;
 	}
 	else if(!strcmp(word,"false")){
-		b=false;
+		b=0;
 	}
 	else{
 		fprintf(stderr,"Invalid input; expected"
@@ -78,10 +79,10 @@ double readReal(){
 
 
 
-void readString(int32_t size, uint8_t* s){
+void readString(int32_t size, uint8_t s[]){
 	int i=0;
 	char c=getc(stdin);
-	while(c!='\n' and c!= EOF and i<size-1){
+	while(c!='\n' && c!= EOF && i<size-1){
 		*s++=(uint8_t)c;
 		c=getc(stdin);
 	}

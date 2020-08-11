@@ -33,7 +33,7 @@ COMMAND bison -d -o ${PCL_COMPILER_SOURCE_DIR}/parser.cpp ${PCL_COMPILER_SOURCE_
 file(GLOB_RECURSE SOURCE_FILES
 	${PCL_COMPILER_SOURCE_DIR}/*.cpp)
 
-add_library(pcl_lib STATIC ${PCL_COMPILER_SOURCE_DIR}/lib.cpp)
+add_library(pcl_lib STATIC ${PCL_COMPILER_SOURCE_DIR}/lib.c)
 
 target_compile_options(pcl_lib
 	PRIVATE
