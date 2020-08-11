@@ -227,11 +227,13 @@ llvm::Value* Op::cgen(){
 			if(rightType->doCompare(intType)){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
-			return Builder.CreateFCmpUNE(leftValue, rightValue, "fnetmp");
+			llvm::Value* v = Builder.CreateFCmpUNE(leftValue, rightValue, "fnetmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 		else{
 			// icmp; works for bool, ptr, int, char
-			return Builder.CreateICmpNE(leftValue, rightValue, "inetmp");
+			llvm::Value* v = Builder.CreateICmpNE(leftValue, rightValue, "inetmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 	}
 	else if(!(op.compare("="))) {
@@ -246,11 +248,13 @@ llvm::Value* Op::cgen(){
 			if(rightType->doCompare(intType)){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
-			return Builder.CreateFCmpOEQ(leftValue, rightValue, "feqtmp");
+			llvm::Value* v = Builder.CreateFCmpOEQ(leftValue, rightValue, "feqtmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 		else{
 			// icmp; works for bool, ptr, int, char
-			return Builder.CreateICmpEQ(leftValue, rightValue, "ieqtmp");
+			llvm::Value* v = Builder.CreateICmpEQ(leftValue, rightValue, "ieqtmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 	}
 
@@ -266,11 +270,13 @@ llvm::Value* Op::cgen(){
 			if(rightType->doCompare(intType)){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
-			return Builder.CreateFCmpOLE(leftValue, rightValue, "fletmp");
+			llvm::Value* v = Builder.CreateFCmpOLE(leftValue, rightValue, "fletmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 		else{
 			// icmp
-			return Builder.CreateICmpSLE(leftValue, rightValue, "iletmp");
+			llvm::Value* v = Builder.CreateICmpSLE(leftValue, rightValue, "iletmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 	}
 	else if(!(op.compare(">="))) {
@@ -285,11 +291,13 @@ llvm::Value* Op::cgen(){
 			if(rightType->doCompare(intType)){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
-			return Builder.CreateFCmpOGE(leftValue, rightValue, "fgetmp");
+			llvm::Value* v = Builder.CreateFCmpOGE(leftValue, rightValue, "fgetmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 		else{
 			// icmp
-			return Builder.CreateICmpSGE(leftValue, rightValue, "igetmp");
+			llvm::Value* v = Builder.CreateICmpSGE(leftValue, rightValue, "igetmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 	}
 	else if(!(op.compare(">"))) {
@@ -304,11 +312,13 @@ llvm::Value* Op::cgen(){
 			if(rightType->doCompare(intType)){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
-			return Builder.CreateFCmpOGT(leftValue, rightValue, "fgttmp");
+			llvm::Value* v = Builder.CreateFCmpOGT(leftValue, rightValue, "fgttmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 		else{
 			// icmp
-			return Builder.CreateICmpSGT(leftValue, rightValue, "igttmp");
+			llvm::Value* v = Builder.CreateICmpSGT(leftValue, rightValue, "igttmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 	}
 	else if(!(op.compare("<"))) {
@@ -323,11 +333,13 @@ llvm::Value* Op::cgen(){
 			if(rightType->doCompare(intType)){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
-			return Builder.CreateFCmpOLT(leftValue, rightValue, "flttmp");
+			llvm::Value* v = Builder.CreateFCmpOLT(leftValue, rightValue, "flttmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 		else{
 			// icmp
-			return Builder.CreateICmpSLT(leftValue, rightValue, "ilttmp");
+			llvm::Value* v = Builder.CreateICmpSLT(leftValue, rightValue, "ilttmp");
+			return Builder.CreateZExt(v,i8,"booltmp");
 		}
 	}
 	else if(!(op.compare("and"))) {
@@ -416,7 +428,8 @@ llvm::Value* Op::cgen(){
 	}
 	else if(!(op.compare("not"))) {
 		//UnOp
-		return Builder.CreateNot(leftValue, "nottmp");
+		llvm::Value* v = Builder.CreateICmpEQ(leftValue, c8_b(0), "nottmp");
+		return Builder.CreateZExt(v,i8,"booltmp");
 	}
 	else{
 		std::cerr<<"Cgen::Internal Error: Invalid BinOp."<<std::endl;
