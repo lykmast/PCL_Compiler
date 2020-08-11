@@ -744,7 +744,7 @@ void Program::cgen(){
 		i32, std::vector<llvm::Type *>{}, false
 	);
 	llvm::Function* main_f = llvm::Function::Create(
-		main_t, llvm::Function::ExternalLinkage, name, TheModule.get()
+		main_t, llvm::Function::ExternalLinkage, "main", TheModule.get()
 	);
 	ct.openScope(main_f);
 	// TODO libraries codegen
