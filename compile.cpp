@@ -528,6 +528,10 @@ void Goto::cgen(){
 
 void Let::cgen(){
 	llvm::Value *e=expr->cgen();
+	if(different_types and is_right_int){ //right is integer and left is real
+		// first convert integer to real
+		e = Builder.CreateSIToFP(e,doubleTy,"transtmp");
+	}
 	llvm::Value *addr=lvalue->getAddr();
 	Builder.CreateStore(e, addr);
 }
