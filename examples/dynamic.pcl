@@ -1,0 +1,18 @@
+program dynamic_prog;
+var
+	ptr, dyn_ptr: ^ integer;
+	i: integer;
+begin
+	i:=5;
+	ptr:=@i;
+	new dyn_ptr;
+	dyn_ptr^:=3;
+	dyn_ptr^:=dyn_ptr^+5;
+	ptr^:=ptr^+1;
+	writeInteger(i);
+	writeChar(',');
+	writeInteger(ptr^);
+	writeChar(',');
+	writeInteger(dyn_ptr^);
+	writeChar('\n');
+end.

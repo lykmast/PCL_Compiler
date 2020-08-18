@@ -17,10 +17,17 @@ begin
 	arr2[3]:=dyn_arr^[0][0];
 	dyn_arr^[1][0]:=dyn_arr^[0][0]+100000;
 	y:=0;
+	if dyn_arr^[0][0] <> 3 then
+		writeString("not 3\n");
 	while y<5 do
 	begin
-		dyn_arr^[0][y]:=10000+dyn_arr^[0][0];
-		dyn_arr^[1][y]:=20000+dyn_arr^[1][0];
+		dyn_arr^[0][y]:=10000+dyn_arr^[0][0]+y;
+		dyn_arr^[1][y]:=20000+dyn_arr^[1][0]+y;
+		writeInteger(dyn_arr^[0][y]);
+		writeChar(',');
+		writeInteger(dyn_arr^[1][y]);
+		writeChar('.');
 		y:=y+1;
 	end;
+	writeChar('\n');
 end.

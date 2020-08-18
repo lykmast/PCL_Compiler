@@ -6,15 +6,21 @@ program reads;
 	 b: boolean;
 	 s: array [10] of char;
 begin
+	writeString("Input integer: ");
 	i:=readInteger();
 	writeInteger(i+1);
+	writeString("\nInput real: ");
 	r:=readReal();
 	writeReal(r+0.5);
+	writeString("\nInput char: ");
 	c:=readChar();
 	writeChar(c);
+	writeString("\nInput bool: ");
 	b:=readBoolean();
 	writeBoolean(not b);
+	writeString("\nInput string: ");
 	readString(10,s);
 	writeString(s);
+	writeChar(s[3]);
 	writeChar('\n');
 end.

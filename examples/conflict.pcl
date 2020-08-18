@@ -1,0 +1,21 @@
+program conflict;
+function abs_pcl(i: integer): integer;
+begin
+	writeString("inside custom \"abs_pcl\"!\n");
+	if i > 0 then
+		result:=i
+	else
+		result:=-i
+end;
+function abs(i: integer): integer;
+begin
+	writeString("inside custom \"abs\"!\n");
+	if i > 0 then
+		result:=i
+	else
+		result:=-i
+end;
+begin
+	writeInteger(abs(-3));writeChar(',');
+	writeInteger(abs_pcl(-3));writeChar('\n');
+end.

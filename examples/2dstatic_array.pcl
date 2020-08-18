@@ -18,4 +18,6 @@ begin
 		end;
 		x:=x+1;
 	end;
+	writeInteger(arr1[1][0][0]); writeChar(','); writeInteger(arr1[0][3][2]);
+	writeChar('\n');
 end.

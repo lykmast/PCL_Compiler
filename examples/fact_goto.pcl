@@ -1,0 +1,18 @@
+program factorial;
+	function fact (i: integer) : integer;
+	label l1,l2;
+		begin
+			result:=0;
+			if i >= 1 then
+				goto l1;
+			result:=1;
+			return;
+l1:
+			result:=fact(i-1)*i;
+			return;
+		end;
+	begin
+		writeString("Give number (not big if possible because ... overflow):\n");
+		writeInteger(fact(readInteger()));
+		writeChar('\n');
+	end.
