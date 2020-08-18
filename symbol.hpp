@@ -16,16 +16,16 @@ Contains symbol table and symbol entities
 
 
 struct SymbolEntry {
-	Type* type;
+	TSPtr type;
 	SymbolEntry() {}
-	SymbolEntry(Type* t) : type(t) {}
+	SymbolEntry(TSPtr t) : type(t) {}
 };
 
 struct FunctionEntry {
-	CallableType* type;
+	SPtr<CallableType> type;
 	Body* body;
 	FunctionEntry() {}
-	FunctionEntry(CallableType* t, Body* bod) : type(t), body(bod) {}
+	FunctionEntry(SPtr<CallableType> t, Body* bod) : type(t), body(bod) {}
 };
 
 class Scope {
@@ -42,14 +42,14 @@ public:
 		if (functions.find(name) == functions.end()) return nullptr;
 		return &(functions[name]);
 	}
-	void insert(std::string name, Type* t) {
+	void insert(std::string name, TSPtr t) {
 		if (locals.find(name) != locals.end()) {
 			std::cerr << "Duplicate variable " << name << std::endl;
 			exit(1);
 		}
 		locals[name] = SymbolEntry(t);
 	}
-	void insert_function(std::string name, CallableType* t, Body* bod) {
+	void insert_function(std::string name, SPtr<CallableType> t, Body* bod) {
 		if (functions.find(name) != functions.end()) {
 			if(functions[name].body){
 				std::cerr << "Duplicate function " << name << std::endl;
@@ -59,7 +59,7 @@ public:
 		functions[name] = FunctionEntry(t, bod);
 	}
 
-	void add_outer(Type* t, std::string name){
+	void add_outer(TSPtr t, std::string name){
 		thisFunction->type->add_outer(t,name);
 		insert(name, t);
 	}
@@ -91,7 +91,7 @@ private:
 class SymbolTable {
 public:
 	void openScope(std::string name) {
-		if (!scopes.empty()){
+		if (scopes.size()>1){
 			FunctionEntry *e = function_lookup(name);
 			scopes.push_back(Scope(e));
 		}
@@ -148,8 +148,8 @@ public:
 		scopes.back().label_lookup(lbl);
 	}
 
-	void insert(std::string name, Type* t) { scopes.back().insert(name, t); }
-	void insert_function(std::string name, CallableType* t, Body* bod) { scopes.back().insert_function(name, t, bod); }
+	void insert(std::string name, TSPtr t) { scopes.back().insert(name, t); }
+	void insert_function(std::string name, SPtr<CallableType> t, Body* bod) { scopes.back().insert_function(name, t, bod); }
 	FunctionEntry *getParentOfCurrentScope() const {return scopes.back().getParent();}
 private:
 	std::vector<Scope> scopes;

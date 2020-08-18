@@ -52,7 +52,8 @@ writeString::writeString():Procedure (
 	),
 	new Body(true )
 ){
-		formals->toFormal(new ArrType(CHARACTER::getInstance()),true);
+		TSPtr arrT(new ArrType(CHARACTER::getInstance()));
+		formals->toFormal(arrT,true);
 }
 
 
@@ -96,7 +97,8 @@ readString::readString():Procedure (
 ){
 		formals->toFormal(INTEGER::getInstance(),false);
 		DeclList* d=new DeclList(new Decl("s"));
-		d->toFormal(new ArrType(CHARACTER::getInstance()),true);
+		TSPtr arrT(new ArrType(CHARACTER::getInstance()));
+		d->toFormal(arrT,true);
 		formals->merge(d);
 }
 

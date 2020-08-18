@@ -5,14 +5,14 @@ Contains constructors and printOn for AST and
 ------------------------------------------ */
 #include "ast.hpp"
 
-Const::Const(Type* ty):type(ty){}
-Const::~Const(){
-	if(type)
-		if(type->should_delete())
-			delete type;
-}
+Const::Const(TSPtr ty):type(ty){}
+// Const::~Const(){
+// 	if(type)
+// 		if(type->should_delete())
+// 			delete type;
+// }
 
-Rconst::Rconst(double n):Const(REAL::getInstance() ),num(n){}
+Rconst::Rconst(double n):Const(REAL::getInstance()),num(n){}
 void Rconst::printOn(std::ostream &out) const{
 	out << "Rconst(" << num << ")";
 }
@@ -27,7 +27,7 @@ void Cconst::printOn(std::ostream &out) const {
 	out << "Cconst(" << ch << ")";
 }
 
-NilConst::NilConst():Const(new PtrType(ANY::getInstance())){}
+NilConst::NilConst():Const(std::make_shared<PtrType>(PtrType(ANY::getInstance()))){}
 void NilConst::printOn(std::ostream &out) const {
 	out << "NilConst("<<*type<< ")";
 }
@@ -44,7 +44,7 @@ void Id::printOn(std::ostream &out) const {
 
 
 
-Bconst::Bconst(bool b):Const(BOOLEAN::getInstance() ),boo(b){}
+Bconst::Bconst(bool b):Const(BOOLEAN::getInstance()),boo(b){}
 
 void Bconst::printOn(std::ostream &out) const {
 	out << "Bconst(" << boo <<")";
@@ -57,7 +57,10 @@ void Bconst::printOn(std::ostream &out) const {
 Op::Op(Expr *l, std::string o, Expr *r): left(l), op(o), right(r),
 	leftType(nullptr), rightType(nullptr), resType(nullptr) {}
 Op::Op(std::string o, Expr *l): left(l), op(o), right(nullptr) {}
-Op::~Op() { delete left; delete right; }
+Op::~Op() {
+	delete left; delete right;
+	// delete_type(leftType); delete_type(rightType); delete_type(resType);
+}
 void Op::printOn(std::ostream &out) const {
 	if(right) out << op << "(" << *left << ", " << *right << ")";
 	else  out << op << "(" << *left << ")";
@@ -180,7 +183,7 @@ void LabelDecl::printOn(std::ostream &out) const {
 
 
 VarDecl::VarDecl(Decl* d):Decl(d->get_id(),"var"),type(nullptr){delete d;}
-VarDecl::VarDecl(Decl* d,Type* t):Decl(d->get_id(),"var"),type(t){delete d;}
+VarDecl::VarDecl(Decl* d,TSPtr t):Decl(d->get_id(),"var"),type(t){delete d;}
 void VarDecl::printOn(std::ostream &out) const{
 	if(type)
 	out << "VarDecl(" <<id<<" of type "<< *type << ")";
@@ -189,12 +192,12 @@ void VarDecl::printOn(std::ostream &out) const{
 }
 
 FormalDecl::FormalDecl(Decl *d, bool ref):VarDecl(d), byRef(ref){}
-FormalDecl::FormalDecl(Decl* d,Type* t,bool ref):VarDecl(d,t), byRef(ref){}
+FormalDecl::FormalDecl(Decl* d,TSPtr t,bool ref):VarDecl(d,t), byRef(ref){}
 bool FormalDecl::isByRef(){return byRef;}
 
 DeclList::DeclList(Decl* d):List<Decl>(d){}
 DeclList::DeclList():List<Decl>(){}
-void DeclList::toVar(Type* t){
+void DeclList::toVar(TSPtr t){
 	for(auto p=list.begin();p!=list.end();p++){
 		Decl *d=new VarDecl(*p,t);
 		*p=d;
@@ -206,7 +209,7 @@ void DeclList::toLabel(){
 		*p=d;
 	}
 }
-void DeclList::toFormal(Type* t, bool ref){
+void DeclList::toFormal(TSPtr t, bool ref){
 	for(auto p=list.begin();p!=list.end();p++){
 		Decl *d=new FormalDecl(*p,t,ref);
 		*p=d;
@@ -233,7 +236,7 @@ void Procedure::printOn(std::ostream &out) const {
 		out<<decl_type<<"(<forward>,"<<*formals<<")";
 }
 
-Function::Function(std::string name, DeclList *decl_list, Type* return_type, Body* bod)
+Function::Function(std::string name, DeclList *decl_list, TSPtr return_type, Body* bod)
 	:Procedure(name,decl_list,bod,"function"), ret_type(return_type){}
 
 Program::Program(std::string nam, Body* bod):name(nam),body(bod){}

@@ -1,17 +1,17 @@
 #include "ast.hpp"
 #include "cgen_table.hpp"
 #include "library.hpp"
+#include "uid.hpp"
 
 const char *filename="llvm_output.out";
 
 static llvm::LLVMContext TheContext;
 static llvm::IRBuilder<> Builder(TheContext);
 static std::unique_ptr<llvm::Module> TheModule;
-// TODO delete; probably not needed.
-static std::map<std::string, llvm::Value *> NamedValues;
-
 
 // useful llvm types
+
+llvm::Type *i1=llvm::Type::getInt1Ty(TheContext);
 llvm::Type *i8=llvm::Type::getInt8Ty(TheContext);
 llvm::Type *i32=llvm::Type::getInt32Ty(TheContext);
 llvm::Type *i64=llvm::Type::getInt64Ty(TheContext);
@@ -61,14 +61,32 @@ std::vector<llvm::Type*> CallableType::cgen_argTypes(){
 	std::vector<llvm::Type*> argTypes(formal_types.size());
 	for(uint i=0; i<formal_types.size();i++){
 		if(by_ref[i]){
-			argTypes[i] = llvm::PointerType::get(formal_types[i]->cgen(), 0);
+			if(!formal_types[i]->get_name().compare("array")){
+				// convert array by reference to pointer to element
+				argTypes[i] = llvm::PointerType::get(
+					std::dynamic_pointer_cast<ArrType >(formal_types[i])
+						->get_type()->cgen(), 0);
+			}
+			else{
+				argTypes[i] = llvm::PointerType::get(formal_types[i]->cgen(), 0);
+			}
 		}
 		else{
 			argTypes[i] = formal_types[i]->cgen();
 		}
 	}
-	for(auto p:outer_types){
-		argTypes.push_back(llvm::PointerType::get(p->cgen(), 0));
+	for(uint i=0; i<outer_types.size();i++){
+		if(!outer_types[i]->get_name().compare("array")){
+			// convert array by reference to pointer to element
+			argTypes.push_back(
+				llvm::PointerType::get(
+					std::dynamic_pointer_cast<ArrType >(outer_types[i])
+					->get_type()->cgen(), 0)
+				);
+		}
+		else{
+			argTypes.push_back(llvm::PointerType::get(outer_types[i]->cgen(), 0));
+		}
 	}
 	return argTypes;
 }
@@ -115,27 +133,65 @@ llvm::Value* Bconst::cgen(){
 }
 
 llvm::Value* Sconst::cgen(){
-	return Builder.CreateGlobalStringPtr(str);
+	//1. Initialize chars vector
+	UniqueID uid;
+	std::vector<llvm::Constant *> chars(str.length());
+	for(unsigned int i = 0; i < str.size(); i++) {
+		chars[i] = llvm::ConstantInt::get(i8, str[i]);
+	}
+
+	//1b. add a zero terminator too
+	chars.push_back(llvm::ConstantInt::get(i8, 0));
+
+
+	//2. Initialize the string from the characters
+	auto stringType = llvm::ArrayType::get(i8, chars.size());
+	auto stringNoSizeType = llvm::ArrayType::get(i8, 0);
+	//3. Create the declaration statement
+	std::string id = ".str"+std::to_string(uid.id);
+	auto globalDeclaration =
+		(llvm::GlobalVariable*) TheModule->getOrInsertGlobal(id, stringType);
+	globalDeclaration->setInitializer(
+		llvm::ConstantArray::get(stringType, chars)
+	);
+	globalDeclaration->setConstant(true);
+	globalDeclaration->setLinkage(
+		llvm::GlobalValue::LinkageTypes::PrivateLinkage
+	);
+	globalDeclaration->setUnnamedAddr (llvm::GlobalValue::UnnamedAddr::Global);
+
+
+
+	//4. Return a cast to an i8*
+	return globalDeclaration;
+
+	// return Builder.CreateGlobalStringPtr(str);
+
+	// return llvm::ConstantDataArray::getString(TheContext, str);
 }
+
+llvm::Value* Sconst::getAddr(){
+	return cgen();
+}
+
+
 llvm::Value* NilConst::cgen(){
 	// i32 by default; will probably be changed by cast
 	return llvm::Constant::getNullValue(i32);
 }
 
 llvm::Value* Op::cgen(){
-	Type* realType=REAL::getInstance();
-	Type* intType=INTEGER::getInstance();
 	llvm::Value* leftValue=left->cgen();
 	llvm::Value* rightValue;
 	if(!(op.compare("+")) and right){
 		//BinOp
 		rightValue=right->cgen();
-		if(resType->doCompare(realType)){
+		if(resType->doCompare(REAL::getInstance())){
 			// fadd
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			return Builder.CreateFAdd(leftValue,rightValue,"addtmp");
@@ -152,12 +208,12 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare("-")) and right) {
 		//BinOp
 		rightValue=right->cgen();
-		if(resType->doCompare(realType)){
+		if(resType->doCompare(REAL::getInstance())){
 			// fsub
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			return Builder.CreateFSub(leftValue,rightValue,"subtmp");
@@ -169,7 +225,7 @@ llvm::Value* Op::cgen(){
 	}
 	else if(!(op.compare("-"))){
 		//UnOp
-		if(leftType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())){
 			return Builder.CreateFNeg(leftValue);
 		}
 		else{
@@ -179,12 +235,12 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare("*"))) {
 		//BinOp
 		rightValue=right->cgen();
-		if(resType->doCompare(realType)){
+		if(resType->doCompare(REAL::getInstance())){
 			// fmul
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			return Builder.CreateFMul(leftValue,rightValue,"multmp");
@@ -197,10 +253,10 @@ llvm::Value* Op::cgen(){
 
 	else if(!(op.compare("/"))){
 		rightValue=right->cgen();
-		if(leftType->doCompare(intType)){
+		if(leftType->doCompare(INTEGER::getInstance())){
 			leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 		}
-		if(rightType->doCompare(intType)){
+		if(rightType->doCompare(INTEGER::getInstance())){
 			rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 		}
 		return Builder.CreateFDiv(leftValue, rightValue,"fdivtmp");
@@ -218,13 +274,13 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare("<>"))) {
 		rightValue=right->cgen();
 
-		if(leftType->doCompare(realType)
-		or rightType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())
+		or rightType->doCompare(REAL::getInstance())){
 			// fcmp
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			llvm::Value* v = Builder.CreateFCmpUNE(leftValue, rightValue, "fnetmp");
@@ -239,13 +295,13 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare("="))) {
 		rightValue=right->cgen();
 
-		if(leftType->doCompare(realType)
-		or rightType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())
+		or rightType->doCompare(REAL::getInstance())){
 			// fcmp
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			llvm::Value* v = Builder.CreateFCmpOEQ(leftValue, rightValue, "feqtmp");
@@ -261,13 +317,13 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare("<="))) {
 		rightValue=right->cgen();
 
-		if(leftType->doCompare(realType)
-		or rightType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())
+		or rightType->doCompare(REAL::getInstance())){
 			// fcmp
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			llvm::Value* v = Builder.CreateFCmpOLE(leftValue, rightValue, "fletmp");
@@ -282,13 +338,13 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare(">="))) {
 		rightValue=right->cgen();
 
-		if(leftType->doCompare(realType)
-		or rightType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())
+		or rightType->doCompare(REAL::getInstance())){
 			// fcmp
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			llvm::Value* v = Builder.CreateFCmpOGE(leftValue, rightValue, "fgetmp");
@@ -303,13 +359,13 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare(">"))) {
 		rightValue=right->cgen();
 
-		if(leftType->doCompare(realType)
-		or rightType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())
+		or rightType->doCompare(REAL::getInstance())){
 			// fcmp
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			llvm::Value* v = Builder.CreateFCmpOGT(leftValue, rightValue, "fgttmp");
@@ -324,13 +380,13 @@ llvm::Value* Op::cgen(){
 	else if(!(op.compare("<"))) {
 		rightValue=right->cgen();
 
-		if(leftType->doCompare(realType)
-		or rightType->doCompare(realType)){
+		if(leftType->doCompare(REAL::getInstance())
+		or rightType->doCompare(REAL::getInstance())){
 			// fcmp
-			if(leftType->doCompare(intType)){
+			if(leftType->doCompare(INTEGER::getInstance())){
 				leftValue=Builder.CreateSIToFP(leftValue,doubleTy,"loptmp");
 			}
-			if(rightType->doCompare(intType)){
+			if(rightType->doCompare(INTEGER::getInstance())){
 				rightValue=Builder.CreateSIToFP(rightValue,doubleTy,"roptmp");
 			}
 			llvm::Value* v = Builder.CreateFCmpOLT(leftValue, rightValue, "flttmp");
@@ -356,7 +412,9 @@ llvm::Value* Op::cgen(){
 			llvm::BasicBlock::Create(TheContext, "andmerge");
 
 		// if leftValue -> no short circuit; else short circuit
-		Builder.CreateCondBr(leftValue, NoShortCircuitBB, ShortCircuitBB);
+		//    convert i8 lvalue to i1.
+		llvm::Value* CondV = Builder.CreateTrunc(leftValue, i1, "cond");
+		Builder.CreateCondBr(CondV, NoShortCircuitBB, ShortCircuitBB);
 
 		/* no-short-circuit block */
 		ct.setCurrentBB(NoShortCircuitBB);
@@ -398,6 +456,8 @@ llvm::Value* Op::cgen(){
 			llvm::BasicBlock::Create(TheContext, "ormerge");
 
 		// if leftValue -> short circuit; else no short circuit
+		//    convert i8 lvalue to i1.
+		llvm::Value* CondV = Builder.CreateTrunc(leftValue, i1, "cond");
 		Builder.CreateCondBr(leftValue, ShortCircuitBB, NoShortCircuitBB);
 
 		/* short-circuit block*/
@@ -410,7 +470,7 @@ llvm::Value* Op::cgen(){
 		TheFunction->getBasicBlockList().push_back(NoShortCircuitBB);
 		ct.setCurrentBB(NoShortCircuitBB);
 		Builder.SetInsertPoint(NoShortCircuitBB);
-		// TODO ct.setCurrentBlock(NoShortCircuit);
+
 		rightValue=right->cgen();
 		ret = Builder.CreateOr(leftValue,rightValue,"ornsctmp");
 		Builder.CreateBr(MergeBB);
@@ -459,20 +519,28 @@ llvm::Value* Reference::cgen(){
 llvm::Value* Dereference::cgen(){
 	llvm::Value* alloca = expr->cgen();
 	if(count){
-		Builder.CreateLoad(alloca, "dereftmp");
-		return Builder.CreateLoad(alloca, "deref2tmp");
+		return Builder.CreateLoad(alloca, "dereftmp");
 	}
-	return Builder.CreateLoad(alloca, "dereftmp");
+	return alloca;
 }
 
 llvm::Value* Brackets::cgen(){
 	llvm::Value* arr;
 	llvm::Value* index_v = expr->cgen();
-	ArrType *arrTy = static_cast<ArrType*>(lvalue->get_type());
+	SPtr<ArrType> arrTy (std::dynamic_pointer_cast<ArrType>(lvalue->get_type()));
 	arr = lvalue->getAddr();
-	// GEP needs first a 0 index because arr is pointer (alloca) to array
-	llvm::Value* ptr = Builder.CreateGEP(
-		arrTy->cgen(), arr, std::vector<llvm::Value*> {c32(0),index_v});
+	llvm::Value* ptr;
+	if(static_cast<llvm::PointerType*>(arr->getType())
+			->getElementType()->isArrayTy()){
+		// GEP needs first a 0 index because arr is pointer (alloca) to array
+		ptr = Builder.CreateGEP( arr, std::vector<llvm::Value*> {c32(0),index_v});
+	}
+	else{
+		// array reference is pointer so needs only one index
+		ptr = Builder.CreateGEP(
+			arr, std::vector<llvm::Value*> {index_v}
+		);
+	}
 	if(arrTy->is_1D()){
 		return Builder.CreateLoad(ptr, "bracktmp");
 	}
@@ -481,15 +549,12 @@ llvm::Value* Brackets::cgen(){
 }
 
 llvm::Value* Dereference::getAddr(){
-	llvm::Value* alloca = expr->cgen();
 	if(count){
-		return Builder.CreateLoad(alloca, "dereftmp");
+		return expr->cgen();
 	}
-	return alloca;
-}
-
-llvm::Value* Sconst::getAddr(){
-	return Builder.CreateGlobalStringPtr(str);
+	else{
+		return static_cast<LValue*>(expr)->getAddr();
+	}
 }
 
 llvm::Value* Id::getAddr(){
@@ -505,17 +570,28 @@ llvm::Value* Id::getAddr(){
 llvm::Value* Brackets::getAddr(){
 	llvm::Value* arr;
 	llvm::Value* index_v = expr->cgen();
-	ArrType *arrTy = static_cast<ArrType*>(lvalue->get_type());
+	SPtr<ArrType> arrTy (std::dynamic_pointer_cast<ArrType>(lvalue->get_type()));
 	arr = lvalue->getAddr();
-	return Builder.CreateGEP(
-		arrTy->cgen(), arr, std::vector<llvm::Value*> {c32(0),index_v});
+	llvm::Value* ptr;
+
+	if(static_cast<llvm::PointerType*>(arr->getType())
+			->getElementType()->isArrayTy()){
+		// GEP needs first a 0 index because arr is pointer (alloca) to array
+		ptr = Builder.CreateGEP( arr, std::vector<llvm::Value*> {c32(0),index_v});
+	}
+	else{
+		// array reference is pointer so needs only one index
+		ptr = Builder.CreateGEP(
+			arr, std::vector<llvm::Value*> {index_v}
+		);
+	}
+	return ptr;
 }
 
 void LabelStmt::cgen(){
 	llvm::Function* TheFunction = ct.getFunction();
-	llvm::BasicBlock *LabelBB =
-		llvm::BasicBlock::Create(TheContext, label_id, TheFunction);
-	ct.insert_label(label_id, LabelBB);
+	llvm::BasicBlock *LabelBB = ct.label_lookup(label_id);
+	TheFunction->getBasicBlockList().push_back(LabelBB);
 	Builder.CreateBr(LabelBB);
 	ct.setCurrentBB(LabelBB);
 	Builder.SetInsertPoint(LabelBB);
@@ -524,6 +600,12 @@ void LabelStmt::cgen(){
 
 void Goto::cgen(){
 	Builder.CreateBr(ct.label_lookup(label_id));
+	// create new garbage block (is unreachable)
+	llvm::Function* TheFunction=ct.getFunction();
+	llvm::BasicBlock *BB =
+		llvm::BasicBlock::Create(TheContext, "garb", TheFunction);
+	ct.setCurrentBB(BB);
+	Builder.SetInsertPoint(BB);
 }
 
 void Let::cgen(){
@@ -547,7 +629,8 @@ void If::cgen(){
 	llvm::BasicBlock *MergeBB =llvm::BasicBlock::Create(TheContext, "ifcont");
 
 	// condition branch
-	llvm::Value* CondV = expr->cgen();
+	llvm::Value* CondV = Builder.CreateTrunc(expr->cgen(), i1, "cond");
+
 	Builder.CreateCondBr(CondV, ThenBB, ElseBB);
 
 	/* then block */
@@ -589,7 +672,7 @@ void While::cgen(){
 	ct.setCurrentBB(BeforeBB);
 	Builder.SetInsertPoint(BeforeBB);
 	// condition branch
-	llvm::Value* CondV = expr->cgen();
+	llvm::Value* CondV = Builder.CreateTrunc(expr->cgen(), i1, "cond");
 	Builder.CreateCondBr(CondV, LoopBB, AfterBB);
 
 	/* loop block */
@@ -608,28 +691,37 @@ void While::cgen(){
 
 void New::cgen(){
 	llvm::DataLayout* DL = new llvm::DataLayout(&(*TheModule));
+	// llvm::DataLayout* DL = new llvm::DataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128");
 	// get size of type to malloc
-	llvm::Type* ty = lvalue->get_type()->cgen();
-	ty = ty->getPointerElementType();
-	llvm::Value *AllocSize = c64(DL->getTypeAllocSize(ty));
+	llvm::Type* ptrTy = lvalue->get_type()->cgen();
+	llvm::Type* ty = ptrTy->getPointerElementType();
+	llvm::Value *AllocSize;
 	if(expr){
 		// array
-		AllocSize=Builder.CreateMul(expr->cgen(),AllocSize);
+		ty = ty->getArrayElementType();
+		AllocSize = c64(DL->getTypeAllocSize(ty));
+		llvm::Value* cast64 = Builder.CreateZExt(expr->cgen(),i64,"cast");
+		AllocSize=Builder.CreateMul(cast64, AllocSize);
 	}
-
+	else{
+		AllocSize = c64(DL->getTypeAllocSize(ty));
+	}
 	llvm::Value *ptr = Builder.CreateCall(
-		TheModule->getFunction("malloc"), AllocSize);
+		TheModule->getFunction("malloc"), std::vector<llvm::Value*> {AllocSize});
+	ptr = Builder.CreateBitCast(ptr, ptrTy);
 	Builder.CreateStore(ptr,lvalue->getAddr());
 }
 
 void Dispose::cgen(){
 	llvm::Value *ptr = Builder.CreateLoad(lvalue->getAddr(),"disptmp");
-	Builder.CreateCall(TheModule->getFunction("free"), ptr );
+	ptr = Builder.CreateBitCast(ptr, llvm::PointerType::get(i8, 0));
+	Builder.CreateCall(TheModule->getFunction("free"), std::vector<llvm::Value*> {ptr} );
 }
 
 void DisposeArr::cgen(){
 	llvm::Value *ptr = Builder.CreateLoad(lvalue->getAddr(),"disptmp");
-	Builder.CreateCall(TheModule->getFunction("free"), ptr );
+	ptr = Builder.CreateBitCast(ptr, llvm::PointerType::get(i8, 0));
+	Builder.CreateCall(TheModule->getFunction("free"), std::vector<llvm::Value*> {ptr} );
 }
 
 void StmtList::cgen(){
@@ -649,6 +741,11 @@ void VarDecl::cgen(){
 	ct.insert(id, alloca);
 }
 
+void LabelDecl::cgen(){
+	llvm::BasicBlock *LabelBB =
+		llvm::BasicBlock::Create(TheContext, id);
+	ct.insert_label(id, LabelBB);
+}
 
 void Body::cgen(){
 	if(defined){
@@ -663,8 +760,14 @@ void Body::cgen(){
 void Procedure::cgen(){
 
 	llvm::FunctionType* FT = static_cast<llvm::FunctionType*>(type->cgen());
+	std::string call_name = id;
+	if(body->isLibrary()){
+		// add suffix to built-in functions to avoid collision
+		//   with C library functions.
+		call_name += "_pcl";
+	}
 	llvm::Function* F = llvm::Function::Create(
-		FT, llvm::Function::ExternalLinkage, id, TheModule.get()
+		FT, llvm::Function::ExternalLinkage, call_name, TheModule.get()
 	);
 	ct.insert_function(id, F);
 	if(body->isLibrary()) return;
@@ -676,6 +779,10 @@ void Procedure::cgen(){
 
 	llvm::BasicBlock *BB = llvm::BasicBlock::Create(TheContext, "entry", F);
 	ct.setCurrentBB(BB);
+	// create function exit block
+	llvm::BasicBlock *ExitBB = llvm::BasicBlock::Create(TheContext,"exit");
+	ct.setExitBB(ExitBB);
+
 	Builder.SetInsertPoint(BB);
 	llvm::Type* ret_type = F->getReturnType();
 	bool isFunction=false;
@@ -700,7 +807,7 @@ void Procedure::cgen(){
 			Idx_formal++;
 		}
 		else if(Idx_outer<os){
-			Arg.setName(formal_vars[Idx_outer++]);
+			Arg.setName(outer_vars[Idx_outer++]);
 			alloca = Builder.CreateAlloca(Arg.getType(), nullptr, Arg.getName());
 			// all outer arguments are passed by reference.
 			ct.insert(Arg.getName(), alloca, true);
@@ -714,9 +821,12 @@ void Procedure::cgen(){
 	}
 
 	body->cgen();
-	// TODO if there is nesting we must return to initial building block.
-
 	// return
+	// exit block
+	Builder.CreateBr(ExitBB);
+	F->getBasicBlockList().push_back(ExitBB);
+	ct.setCurrentBB(ExitBB);
+	Builder.SetInsertPoint(ExitBB);
 	if(isFunction){
 		llvm::Value* res = Builder.CreateLoad(result_alloca, "result");
 		Builder.CreateRet(res);
@@ -730,18 +840,32 @@ void Procedure::cgen(){
 }
 
 void Return::cgen(){
-	llvm::Type* ret_type = ct.getFunction()->getReturnType();
-	if(ret_type->isVoidTy()){
-		Builder.CreateRetVoid();
-	}
-	else{
-		bool ref;
-		llvm::AllocaInst* result_alloca = ct.lookup("result", ref);
-		llvm::Value *res = Builder.CreateLoad(result_alloca, "result");
-		Builder.CreateRet(res);
-	}
+	// unconditional jump to the exit block
+	// current block is ended by ret.
+	Builder.CreateBr(ct.getExitBB());
+	// create new garbage block (is unreachable)
+	llvm::Function* TheFunction=ct.getFunction();
+	llvm::BasicBlock *BB =
+		llvm::BasicBlock::Create(TheContext, "garb", TheFunction);
+	ct.setCurrentBB(BB);
+	Builder.SetInsertPoint(BB);
 }
-
+static void create_mem_funcs(){
+	// create malloc
+	llvm::FunctionType* malloc_type = llvm::FunctionType::get(
+		llvm::PointerType::get(i8, 0), std::vector<llvm::Type *>{i64}, false
+	);
+	llvm::Function* malloc_f = llvm::Function::Create(
+		malloc_type, llvm::Function::ExternalLinkage, "malloc", TheModule.get()
+	);
+	// create free
+	llvm::FunctionType* free_type = llvm::FunctionType::get(
+		voidTy, llvm::PointerType::get(i8, 0), false
+	);
+	llvm::Function* free_f = llvm::Function::Create(
+		free_type, llvm::Function::ExternalLinkage, "free", TheModule.get()
+	);
+}
 void Program::cgen(){
 	TheModule = llvm::make_unique<llvm::Module>(filename, TheContext);
 	llvm::FunctionType* main_t = llvm::FunctionType::get(
@@ -750,19 +874,23 @@ void Program::cgen(){
 	llvm::Function* main_f = llvm::Function::Create(
 		main_t, llvm::Function::ExternalLinkage, "main", TheModule.get()
 	);
-	ct.openScope(main_f);
-	// TODO libraries codegen
+
+	ct.openScope();
+	// outer scope contains only library functions
 	// load library subprograms
 	for(auto p:library_subprograms){
 		p->cgen();
 	}
+
+	ct.openScope(main_f);
+	create_mem_funcs();
 	llvm::BasicBlock *BB = llvm::BasicBlock::Create(TheContext, "entry", main_f);
 	ct.setCurrentBB(BB);
 	Builder.SetInsertPoint(BB);
 	body->cgen();
 	Builder.CreateRet(c32(0));
 	ct.closeScope();
-	// TODO how does this vvvv work?
+	ct.closeScope();
 	TheModule->print(llvm::outs(), nullptr);
 }
 
@@ -770,10 +898,28 @@ std::vector<llvm::Value*> ExprList::cgen(std::vector<bool> by_ref){
 	// eval every expression
 	// considering passing mode (by-reference / by-value)
 	std::vector<llvm::Value*> ret(list.size());
+	std::vector<TSPtr> types = get_type();
 	for(uint i=0; i<list.size(); i++){
 		if(by_ref[i]){ // passing mode is by-reference
 			// return address
-			ret[i]=static_cast<LValue*>(list[i])->getAddr();
+			llvm::Value* tmp=static_cast<LValue*>(list[i])->getAddr();
+			if(!types[i]->get_name().compare("array")){
+				// if array by reference return first element address
+
+				if(static_cast<llvm::PointerType*>(tmp->getType())
+						->getElementType()->isArrayTy()){
+					// GEP needs first a 0 index because arr is pointer (alloca) to array
+					tmp = Builder.CreateGEP(
+						tmp, std::vector<llvm::Value*> {c32(0),c32(0)}, "cast");
+				}
+				else{
+					// array reference is pointer so needs only one index
+					tmp = Builder.CreateGEP(
+						tmp, std::vector<llvm::Value*> {c32(0)}, "cast"
+					);
+				}
+			}
+			ret[i]=tmp;
 		}
 		else{
 			ret[i]=list[i]->cgen();

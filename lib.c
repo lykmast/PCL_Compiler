@@ -4,27 +4,27 @@
 #include "string.h"
 #include "stdlib.h"
 
-void writeInteger(int32_t i){
+void writeInteger_pcl(int32_t i){
 	printf("%d",i);
 }
 
-void writeBoolean(uint8_t b){
+void writeBoolean_pcl(uint8_t b){
 	printf("%s", b ? "true" : "false");
 }
 
-void writeChar(uint8_t c){
+void writeChar_pcl(uint8_t c){
 	printf("%c",c);
 }
 
-void writeReal(double r){
+void writeReal_pcl(double r){
 	printf("%lf",r);
 }
 
-void writeString(uint8_t s[]){
+void writeString_pcl(uint8_t s[]){
 	printf("%s",s );
 }
 
-int32_t readInteger(){
+int32_t readInteger_pcl(){
 	char buf[256];
 	if(fgets(buf,sizeof(buf),stdin)){
 		return atoi(buf);
@@ -36,7 +36,7 @@ int32_t readInteger(){
 
 }
 
-uint8_t readBoolean(){
+uint8_t readBoolean_pcl(){
 	char word[7];
 	uint8_t b;
 	if(!fgets(word, 7, stdin)){
@@ -61,14 +61,14 @@ uint8_t readBoolean(){
 
 
 
-uint8_t readChar(){
+uint8_t readChar_pcl(){
 	return getc(stdin);
 }
 
 
 
 
-double readReal(){
+double readReal_pcl(){
 	char buf[256];
 	if(!fgets(buf,sizeof(buf),stdin)){
 		fprintf(stderr,"Too long input\n");
@@ -79,7 +79,7 @@ double readReal(){
 
 
 
-void readString(int32_t size, uint8_t s[]){
+void readString_pcl(int32_t size, uint8_t s[]){
 	int i=0;
 	char c=getc(stdin);
 	while(c!='\n' && c!= EOF && i<size-1){

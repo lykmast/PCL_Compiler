@@ -55,8 +55,16 @@ public:
 		CurrentBB = BB;
 	}
 
+	void setExitBB(llvm::BasicBlock* BB){
+		ExitBB = BB;
+	}
+
 	llvm::BasicBlock* getCurrentBB(){
 		return CurrentBB;
+	}
+
+	llvm::BasicBlock* getExitBB(){
+		return ExitBB;
 	}
 private:
 	std::map<std::string, llvm::AllocaInst*> vars;
@@ -65,6 +73,7 @@ private:
 	std::map<std::string, llvm::BasicBlock*> labels;
 	llvm::Function *TheFunction;
 	llvm::BasicBlock* CurrentBB;
+	llvm::BasicBlock* ExitBB;
 
 };
 
@@ -106,6 +115,14 @@ public:
 
 	llvm::BasicBlock* getCurrentBB(){
 		return scopes.back().getCurrentBB();
+	}
+
+	void setExitBB(llvm::BasicBlock* BB){
+		scopes.back().setExitBB(BB);
+	}
+
+	llvm::BasicBlock* getExitBB(){
+		return scopes.back().getExitBB();
 	}
 
 	llvm::Function* function_lookup(std::string name){

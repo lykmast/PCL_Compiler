@@ -5,6 +5,7 @@ Contains class declarations for AST and all
 ------------------------------------------ */
 #pragma once
 #include <iostream>
+#include <memory>
 #include <map>
 #include <vector>
 #include <string>
@@ -22,6 +23,12 @@ Contains class declarations for AST and all
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include <llvm/IR/Value.h>
+class Type;
+
+template<class T>
+using SPtr = std::shared_ptr<T>;
+using TSPtr = SPtr<Type>;
+
 
 class LValue;
 struct FunctionEntry;
@@ -64,11 +71,11 @@ public:
 
 	virtual void printOn(std::ostream &out) const override;
 
-	virtual Type* clone();
+	// virtual TSPtr clone();
 
 	virtual bool should_delete() const;
 
-	virtual bool doCompare(Type* t);
+	virtual bool doCompare(TSPtr t);
 
 	virtual llvm::Type* cgen(){return nullptr;}
 
@@ -76,24 +83,42 @@ protected:
 	std::string name;
 };
 
+// static void delete_type(TSPtr t){
+// 	if(t->should_delete())
+// 		delete t;
+// }
+
+
 class LABEL: public Type{
 private:
 	LABEL():Type("label"){}  //private constructor to prevent instancing
 public:
-	static LABEL* getInstance(){
+	static TSPtr* getPtrInstance(){
 		static LABEL instance;
-		return &instance;
+		static TSPtr ptr_inst(&instance);
+		return &ptr_inst;
 	}
+
+	static TSPtr getInstance(){
+		return *getPtrInstance();
+	}
+
 };
 
 class INTEGER: public Type{
 private:
 	INTEGER():Type("integer"){}  //private constructor to prevent instancing
 public:
-	static INTEGER* getInstance(){
+	static TSPtr* getPtrInstance(){
 		static INTEGER instance;
-		return &instance;
+		static TSPtr ptr_inst(&instance);
+		return &ptr_inst;
 	}
+
+	static TSPtr getInstance(){
+		return *getPtrInstance();
+	}
+
 
 	virtual llvm::Type* cgen() override;
 
@@ -103,10 +128,16 @@ class REAL: public Type{
 private:
 	REAL():Type("real"){}  //private constructor to prevent instancing
 public:
-	static REAL* getInstance(){
+	static TSPtr* getPtrInstance(){
 		static REAL instance;
-		return &instance;
+		static TSPtr ptr_inst(&instance);
+		return &ptr_inst;
 	}
+
+	static TSPtr getInstance(){
+		return *getPtrInstance();
+	}
+
 	virtual llvm::Type* cgen() override;
 };
 
@@ -114,10 +145,16 @@ class BOOLEAN: public Type{
 private:
 	BOOLEAN():Type("boolean"){}  //private constructor to prevent instancing
 public:
-	static BOOLEAN* getInstance(){
+	static TSPtr* getPtrInstance(){
 		static BOOLEAN instance;
-		return &instance;
+		static TSPtr ptr_inst(&instance);
+		return &ptr_inst;
 	}
+
+	static TSPtr getInstance(){
+		return *getPtrInstance();
+	}
+
 	virtual llvm::Type* cgen() override;
 };
 
@@ -125,10 +162,16 @@ class CHARACTER: public Type{
 private:
 	CHARACTER():Type("character"){}  //private constructor to prevent instancing
 public:
-	static CHARACTER* getInstance(){
+	static TSPtr* getPtrInstance(){
 		static CHARACTER instance;
-		return &instance;
+		static TSPtr ptr_inst(&instance);
+		return &ptr_inst;
 	}
+
+	static TSPtr getInstance(){
+		return *getPtrInstance();
+	}
+
 	virtual llvm::Type* cgen() override;
 };
 
@@ -136,46 +179,60 @@ class ANY: public Type{
 private:
 	ANY():Type("any"){}  //private constructor to prevent instancing
 public:
-	static ANY* getInstance(){
+	static TSPtr* getPtrInstance(){
 		static ANY instance;
-		return &instance;
+		static TSPtr ptr_inst(&instance);
+		return &ptr_inst;
 	}
+
+	static TSPtr getInstance(){
+		return *getPtrInstance();
+	}
+
 	virtual llvm::Type* cgen() override;
 };
+
+// singleton global types
+// extern TSPtr intType;
+// extern TSPtr realType;
+// extern TSPtr boolType;
+// extern TSPtr charType;
+// extern TSPtr anyType;
+// extern TSPtr labelType;
 
 
 class PtrType: public Type{
 public:
-	PtrType(Type* t);
-	PtrType(std::string name,Type* t);
-	~PtrType();
+	PtrType(TSPtr t);
+	PtrType(std::string name,TSPtr t);
+	// ~PtrType();
 
-	virtual Type* clone() override;
+	// virtual Type* clone() override;
 
-	Type* get_type();
+	TSPtr get_type();
 
 	virtual void printOn(std::ostream &out) const override;
 
 	virtual bool should_delete() const override;
 
-	virtual bool doCompare(Type* t) override;
+	virtual bool doCompare(TSPtr t) override;
 
 	virtual llvm::Type* cgen() override;
 protected:
-	Type* type;
+	TSPtr type;
 };
 
 
 class ArrType: public PtrType{
 public:
-	ArrType(int s,Type* t);
-	ArrType(Type* t);
+	ArrType(int s,TSPtr t);
+	ArrType(TSPtr t);
 
-	virtual Type* clone() override;
+	// virtual Type* clone() override;
 
 	int get_size();
 
-	virtual bool doCompare(Type* t) override;
+	virtual bool doCompare(TSPtr t) override;
 
 	virtual void printOn(std::ostream &out) const override;
 	bool is_1D();
@@ -189,37 +246,37 @@ class CallableType: public Type{
 public:
 	CallableType(std::string func_type, FormalDeclList* formals);
 	virtual bool should_delete() const override;
-	void typecheck_args(std::vector<Type*> arg_types);
+	void typecheck_args(std::vector<TSPtr> arg_types);
 
 	void check_passing(std::vector<bool> ref);
 
 	std::vector<bool> get_by_ref();
 
 
-	std::vector<Type*> get_types();
+	std::vector<TSPtr> get_types();
 
 	std::vector<std::string> get_outer_vars();
 
-	void add_outer(Type *t, std::string name);
+	void add_outer(TSPtr t, std::string name);
 
 	std::vector<std::string> get_formal_vars();
 
 protected:
-	std::vector<Type*> formal_types;
+	std::vector<TSPtr> formal_types;
 	std::vector<std::string> formal_vars;
 	std::vector<bool> by_ref;
 	std::vector<std::string> outer_vars;
-	std::vector<Type*> outer_types;
+	std::vector<TSPtr> outer_types;
 	std::vector<llvm::Type*> cgen_argTypes();
 };
 
 class FunctionType: public CallableType{
 public:
-	FunctionType( Type* ret_ty , FormalDeclList* formals);
-	Type* get_ret_type();
+	FunctionType(TSPtr ret_ty , FormalDeclList* formals);
+	TSPtr get_ret_type();
 	virtual llvm::Type* cgen() override;
 private:
-	Type* ret_type;
+	TSPtr ret_type;
 };
 
 class ProcedureType: public CallableType{
@@ -231,7 +288,7 @@ public:
 class Const;
 class Expr: public AST {
 public:
-	virtual Type* get_type()=0;
+	virtual TSPtr get_type()=0;
 	virtual llvm::Value* cgen()=0;
 	virtual bool isLValue() const{return false;}
 	virtual Expr* simplify(int count) {return nullptr;}
@@ -257,11 +314,11 @@ public:
 
 class Const: public Expr{
 public:
-	Const(Type* ty);
-	~Const();
-	virtual Type* get_type() override;
+	Const(TSPtr ty);
+	// ~Const();
+	virtual TSPtr get_type() override;
 protected:
-	Type* type;
+	TSPtr type;
 };
 
 class LValue: public Expr{
@@ -317,7 +374,7 @@ public:
 	virtual void printOn(std::ostream &out) const override;
 	virtual llvm::Value* cgen() override;
 	virtual llvm::Value* getAddr() override;
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 private:
 	std::string str;
 };
@@ -327,11 +384,11 @@ public:
 	Id(std::string v);
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 	virtual llvm::Value* getAddr() override;
 private:
 	std::string name;
-	Type* type;
+	TSPtr type;
 
 	virtual llvm::Value* cgen() override;
 };
@@ -353,14 +410,14 @@ public:
 	~Op();
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 	virtual llvm::Value* cgen() override;
 
 private:
 	Expr *left;
 	std::string op;
 	Expr *right;
-	Type *leftType,*rightType,*resType;
+	TSPtr leftType, rightType, resType;
 };
 
 class Reference: public Expr{
@@ -371,7 +428,7 @@ public:
 
 	virtual void sem() override;
 
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 
 	LValue* get_lvalue(){ return lvalue;}
 
@@ -391,7 +448,7 @@ public:
 
 	virtual void sem() override;
 
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 
 	Expr* get_expr(){ return expr;}
 
@@ -414,7 +471,7 @@ public:
 
 	virtual void sem() override;
 
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 
 	virtual llvm::Value* cgen() override;
 
@@ -454,8 +511,8 @@ public:
 	virtual void printOn(std::ostream &out) const override;
 	virtual void sem() override;
 	virtual void cgen() override;
-	static bool typecheck(Type* lType, Type* rType);
-	static char parse_as(Type *t);
+	static bool typecheck(TSPtr lType, TSPtr rType);
+	static char parse_as(TSPtr t);
 protected:
 	LValue  *lvalue;
 	Expr *expr;
@@ -577,7 +634,7 @@ public:
 	ExprList(Expr *e);
 	virtual void printOn(std::ostream &out) const override;
 
-	std::vector<Type*> get_type();
+	std::vector<TSPtr> get_type();
 
 	virtual std::vector<llvm::Value*> cgen(std::vector<bool> by_ref);
 };
@@ -589,7 +646,7 @@ public:
 	virtual void printOn(std::ostream &out) const override {
 		out << "Decl(" << decl_type <<":"<<id<<")";
 	}
-	virtual Type* get_type(){return nullptr;}
+	virtual TSPtr get_type(){return nullptr;}
 	std::string get_id(){return id;}
 	virtual void cgen(){}
 protected:
@@ -601,28 +658,29 @@ class LabelDecl:public Decl{
 public:
 	LabelDecl(Decl* d);
 	virtual void printOn(std::ostream &out) const override;
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 	virtual void sem() override;
+	virtual void cgen() override;
 };
 
 class VarDecl: public Decl{
 public:
 	VarDecl(Decl* d);
-	VarDecl(Decl* d,Type* t);
+	VarDecl(Decl* d,TSPtr t);
 	virtual void printOn(std::ostream &out) const override;
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 	virtual void sem() override;
 	virtual void cgen() override;
 
 protected:
-	Type* type;
+	TSPtr type;
 };
 
 
 class FormalDecl: public VarDecl{
 public:
 	FormalDecl(Decl *d, bool ref);
-	FormalDecl(Decl* d,Type* t,bool ref);
+	FormalDecl(Decl* d,TSPtr t,bool ref);
 	bool isByRef();
 protected:
 	bool byRef;
@@ -632,12 +690,12 @@ class DeclList: public List<Decl>{
 public:
 	DeclList(Decl* d);
 	DeclList();
-	void toVar(Type* t);
+	void toVar(TSPtr t);
 	virtual void sem() override;
 
 	void toLabel();
-	void toFormal(Type* t, bool ref);
-	std::vector<Type*> get_type();
+	void toFormal(TSPtr t, bool ref);
+	std::vector<TSPtr> get_type();
 	virtual void cgen();
 };
 
@@ -684,19 +742,19 @@ public:
 
 	virtual void cgen() override;
 protected:
-	void sem_helper(bool isFunction=false, Type* ret_type=nullptr);
+	void sem_helper(bool isFunction=false, TSPtr ret_type=nullptr);
 	Body* body;
 	FormalDeclList* formals;
-	CallableType* type;
+	SPtr<CallableType> type;
 };
 
 class Function:public Procedure{
 public:
 	Function(std::string name, DeclList *decl_list,
-		Type* return_type, Body* bod);
+		TSPtr return_type, Body* bod);
 	virtual void sem() override;
 protected:
-	Type* ret_type;
+	TSPtr ret_type;
 };
 
 class Program: public AST{
@@ -742,11 +800,11 @@ class FunctionCall: public Call, public Expr{
 public:
 	FunctionCall(std::string nam, ExprList* exp);
 	virtual void sem() override;
-	virtual Type* get_type() override;
+	virtual TSPtr get_type() override;
 
 	virtual void printOn(std::ostream &out) const override ;
 
 	virtual llvm::Value* cgen() override;
 private:
-	Type* type;
+	TSPtr type;
 };

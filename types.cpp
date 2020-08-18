@@ -5,6 +5,7 @@ Contains type classes and related members such
 ------------------------------------------ */
 #include "ast.hpp"
 
+
 Type::Type(std::string t):name(t){}
 
 std::string Type::get_name(){
@@ -14,30 +15,30 @@ std::string Type::get_name(){
 void Type::printOn(std::ostream &out) const{
 	out << "Type(" << name << ")";
 }
-Type* Type::clone(){return this;}
+// Type* Type::clone(){return this;}
 bool Type::should_delete() const{//should not delete Singleton
 	return false;
 }
-bool Type::doCompare(Type* t){
+bool Type::doCompare(TSPtr t){
 	return !(name.compare(t->get_name()))
 		or !name.compare("any")
 		or !t->get_name().compare("any");
 }
 
 
-PtrType::PtrType(Type* t):Type("pointer"),type(t){}
+PtrType::PtrType(TSPtr t):Type("pointer"),type(t){}
 
-PtrType::PtrType(std::string name,Type* t):Type(name),type(t){}
+PtrType::PtrType(std::string name,TSPtr t):Type(name),type(t){}
 
-PtrType::~PtrType(){
-	if(type)
-		if(type->should_delete())
-			delete type;
-}
-Type* PtrType::clone(){
-	return new PtrType(type->clone());
-}
-Type* PtrType::get_type(){ return type->clone();}
+// PtrType::~PtrType(){
+// 	if(type)
+// 		if(type->should_delete())
+// 			delete type;
+// }
+// Type* PtrType::clone(){
+// 	return new PtrType(type->clone());
+// }
+TSPtr PtrType::get_type(){ return type;}
 void PtrType::printOn(std::ostream &out) const {
 	out << "PtrType(" << name <<"of type "<< *type << ")";
 }
@@ -46,28 +47,29 @@ bool PtrType::should_delete() const{
 }
 
 
-bool PtrType::doCompare(Type* t){
+bool PtrType::doCompare(TSPtr t){
 	if (!(name.compare(t->get_name()))){
-		PtrType* pTy=static_cast<PtrType*>(t);
-		return type->doCompare(pTy->get_type());
+		SPtr<PtrType> pTy = std::static_pointer_cast<PtrType>(t);
+		TSPtr inType(pTy->get_type());
+		return type->doCompare(inType);
 	}
 	return false;
 }
 
 
 
-ArrType::ArrType(int s,Type* t):PtrType("array",t),size(s){}
-ArrType::ArrType(Type* t):PtrType("array",t),size(-1){}
+ArrType::ArrType(int s,TSPtr t):PtrType("array",t),size(s){}
+ArrType::ArrType(TSPtr t):PtrType("array",t),size(-1){}
 
-Type* ArrType::clone(){
-	return new ArrType(size,type->clone());
-}
+// Type* ArrType::clone(){
+// 	return new ArrType(size,type->clone());
+// }
 
 int ArrType::get_size(){return size;}
 
-bool ArrType::doCompare(Type* t){
+bool ArrType::doCompare(TSPtr t){
 	if (!(name.compare(t->get_name()))){
-		ArrType* arrTy=static_cast<ArrType*>(t);
+		SPtr<ArrType> arrTy = std::static_pointer_cast<ArrType>(t);
 		return size==arrTy->get_size() and type->doCompare(arrTy->get_type());
 	}
 	return false;
@@ -77,6 +79,7 @@ void ArrType::printOn(std::ostream &out) const {
 }
 
 bool ArrType::is_1D(){
+	// if inside type is array, then this array is not 1D.
 	return type->get_name().compare("array");
 }
 
@@ -89,7 +92,7 @@ bool CallableType::should_delete() const{
 	return true;
 }
 
-void CallableType::typecheck_args(std::vector<Type*> arg_types){
+void CallableType::typecheck_args(std::vector<TSPtr> arg_types){
 	if (arg_types.size()!=formal_types.size()){
 		std::cerr<<"Expected "<<formal_types.size()<<" arguments, "
 			<<arg_types.size()<<" were given."<<std::endl;
@@ -127,7 +130,7 @@ std::vector<bool> CallableType::get_by_ref(){
 }
 
 
-std::vector<Type*> CallableType::get_types(){
+std::vector<TSPtr> CallableType::get_types(){
 	return formal_types;
 }
 
@@ -139,7 +142,7 @@ std::vector<std::string> CallableType::get_formal_vars(){
 	return formal_vars;
 }
 
-void CallableType::add_outer(Type*t, std::string name){
+void CallableType::add_outer(TSPtr t, std::string name){
 	// variable that belongs to outer scope is add as implicit
 	//   argument passed by reference
 	outer_vars.push_back(name);
@@ -147,60 +150,62 @@ void CallableType::add_outer(Type*t, std::string name){
 }
 
 
-FunctionType::FunctionType( Type* ret_ty , FormalDeclList* formals):
+FunctionType::FunctionType( TSPtr ret_ty , FormalDeclList* formals):
 	CallableType("function", formals),ret_type(ret_ty){}
 
-Type* FunctionType::get_ret_type(){
-	return ret_type->clone();
+TSPtr FunctionType::get_ret_type(){
+	return ret_type;
 }
 
 ProcedureType::ProcedureType(FormalDeclList* formals):
 	CallableType("procedure", formals){}
 
-Type* Const::get_type(){return type->clone();}
+TSPtr Const::get_type(){return type;}
 
-Type* Sconst::get_type(){
-	return new ArrType(str.size()+1, CHARACTER::getInstance());
+TSPtr Sconst::get_type(){
+	return std::static_pointer_cast<Type>(
+		std::make_shared<ArrType>(str.size()+1, CHARACTER::getInstance())
+	);
 }
-Type* Id::get_type(){
-	return type->clone();
-}
-Type* Op::get_type(){
-	return resType;
-}
-Type* Reference::get_type(){
-	return new PtrType(lvalue->get_type());
-}
-Type* Dereference::get_type(){
-	Type* con_ty=expr->get_type();
-	PtrType* p_ty=static_cast<PtrType*>(con_ty);
-	return p_ty->get_type();
-}
-Type* Brackets::get_type(){
-	Type* l_ty = lvalue->get_type();
-	ArrType* larr_ty=static_cast<ArrType*>(l_ty);
-	return larr_ty->get_type();
-}
-Type* LabelDecl::get_type(){
-	return LABEL::getInstance();
-}
-Type* VarDecl::get_type(){
-	return type->clone();
-}
-Type* FunctionCall::get_type(){
+TSPtr Id::get_type(){
 	return type;
 }
-std::vector<Type*> DeclList::get_type(){
-	std::vector<Type*> types;
+TSPtr Op::get_type(){
+	return resType;
+}
+TSPtr Reference::get_type(){
+	return TSPtr(new PtrType(lvalue->get_type()));
+}
+TSPtr Dereference::get_type(){
+	TSPtr con_ty(expr->get_type());
+	SPtr<PtrType> p_ty = std::static_pointer_cast<PtrType>(con_ty);
+	return p_ty->get_type();
+}
+TSPtr Brackets::get_type(){
+	TSPtr l_ty(lvalue->get_type());
+	SPtr<ArrType> larr_ty = std::static_pointer_cast<ArrType>(l_ty);
+	return larr_ty->get_type();
+}
+TSPtr LabelDecl::get_type(){
+	return LABEL::getInstance();
+}
+TSPtr VarDecl::get_type(){
+	return type;
+}
+TSPtr FunctionCall::get_type(){
+	return type;
+}
+std::vector<TSPtr> DeclList::get_type(){
+	std::vector<TSPtr> types;
 	for(auto p=list.begin();p!=list.end();p++){
-		types.push_back((*p)->get_type());
+		types.push_back(TSPtr((*p)->get_type()));
 	}
 	return types;
 }
-std::vector<Type*> ExprList::get_type(){
-	std::vector<Type*> ret;
+std::vector<TSPtr> ExprList::get_type(){
+	std::vector<TSPtr> ret;
 	for(auto p:list){
-		ret.push_back(p->get_type());
+		ret.push_back(TSPtr(p->get_type()));
 	}
 	return ret;
 }

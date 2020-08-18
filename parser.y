@@ -76,7 +76,7 @@ Syntax parser for pcl compiler in bison.
 	Procedure* proc;
 	StmtList* stmtList;
 	Expr* expr;
-	Type* type;
+	TSPtr* type;
 	LValue* lvalue;
 	std::string* var;
 	int numi;
@@ -125,8 +125,8 @@ local:
 ;
 
 var_decl:
-  mult_ids ':' type ';' {$1->toVar($3); $$ = $1;}
-| var_decl mult_ids ':' type ';' {$2->toVar($4); $1->merge($2); $$=$1;}
+  mult_ids ':' type ';' {$1->toVar(*$3); $$ = $1;}
+| var_decl mult_ids ':' type ';' {$2->toVar(*$4); $1->merge($2); $$=$1;}
 ;
 
 mult_ids:
@@ -135,27 +135,27 @@ mult_ids:
 ;
 
 type:
-  "integer" {$$=INTEGER::getInstance();}
-| "real"  {$$ = REAL::getInstance(); }
-| "boolean" {$$ =BOOLEAN::getInstance(); }
-| "char" {$$ = CHARACTER::getInstance(); }
-| "array" '[' T_iconst ']' "of" full_type {$$ = new ArrType($3,$6);}
-| "array" "of" full_type {$$ = new ArrType($3);}
-| '^' type {$$ = new PtrType($2);}
+  "integer" {$$= INTEGER::getPtrInstance();}
+| "real"  {$$ = REAL::getPtrInstance(); }
+| "boolean" {$$ = BOOLEAN::getPtrInstance(); }
+| "char" {$$ = CHARACTER::getPtrInstance(); }
+| "array" '[' T_iconst ']' "of" full_type {$$ = new TSPtr(new ArrType($3,*$6));}
+| "array" "of" full_type {$$ = new TSPtr( new ArrType(*$3));}
+| '^' type {$$ = new TSPtr(new PtrType(*$2));}
 ;
 
 full_type:
-"integer" {$$=INTEGER::getInstance();}
-| "real"  {$$ = REAL::getInstance(); }
-| "boolean" {$$ =BOOLEAN::getInstance(); }
-| "char" {$$ = CHARACTER::getInstance(); }
-| "array" '[' T_iconst ']' "of" full_type {$$ = new ArrType($3,$6);}
-| '^' full_type {$$ = new PtrType($2);}
+"integer" {$$= INTEGER::getPtrInstance();}
+| "real"  {$$ = REAL::getPtrInstance(); }
+| "boolean" {$$ = BOOLEAN::getPtrInstance(); }
+| "char" {$$ = CHARACTER::getPtrInstance(); }
+| "array" '[' T_iconst ']' "of" full_type {$$ = new TSPtr(new ArrType($3,*$6));}
+| '^' full_type {$$ = new TSPtr (new PtrType(*$2));}
 ;
 
 header:
   "procedure" T_id '(' args ')' {$$ = new Procedure(*$2,$4, new Body());}
-| "function" T_id '(' args ')' ':' type {$$ = new Function(*$2,$4,$7, new Body());}
+| "function" T_id '(' args ')' ':' type {$$ = new Function(*$2,$4,*$7, new Body());}
 ;
 
 args:
@@ -169,8 +169,8 @@ mult_formals:
 ;
 
 formal:
-  "var" mult_ids ':' type {$2->toFormal($4,true); $$=$2;}
-| mult_ids ':' type {$1->toFormal($3,false); $$ = $1;}
+  "var" mult_ids ':' type {$2->toFormal(*$4,true); $$=$2;}
+| mult_ids ':' type {$1->toFormal(*$3,false); $$ = $1;}
 ;
 
 block:
@@ -270,6 +270,5 @@ mult_exprs:
 
 int main() {
   int result = yyparse();
-  if (result == 0) fprintf(stderr,"Success.\n");
   return result;
 }

@@ -21,9 +21,6 @@ void Op::sem(){
 	// sets leftType, rightType and resType fields
 	// it should be run only once even when we have repeated evals
 	// e.g in while
-	Type* intType=INTEGER::getInstance();
-	Type* realType=REAL::getInstance();
-	Type* boolType=BOOLEAN::getInstance();
 	left->sem();
 	leftType=left->get_type();
 
@@ -32,65 +29,65 @@ void Op::sem(){
 		rightType=right->get_type();
 		if(!(op.compare("+")) or !(op.compare("-")) or !(op.compare("*"))){
 			//real or int operands-> real or int result
-			if( (leftType->doCompare(realType) or leftType->doCompare(intType))
-			and (rightType->doCompare(realType) or rightType->doCompare(intType)) ){
+			if( (leftType->doCompare(REAL::getInstance()) or leftType->doCompare(INTEGER::getInstance()))
+			and (rightType->doCompare(REAL::getInstance()) or rightType->doCompare(INTEGER::getInstance())) ){
 				//is a number (real or int)
-				if(leftType->doCompare(realType) or rightType->doCompare(realType))
+				if(leftType->doCompare(REAL::getInstance()) or rightType->doCompare(REAL::getInstance()))
 					// one of them is real
-					resType=realType;
+					resType = REAL::getInstance();
 				else
-					resType=intType;
+					resType = INTEGER::getInstance();
 			}
 		}
 
 		if(!(op.compare("/"))){
 			//real or int operands-> real result
-			if( (leftType->doCompare(realType) or leftType->doCompare(intType))
-			and (rightType->doCompare(realType) or rightType->doCompare(intType)))
+			if( (leftType->doCompare(REAL::getInstance()) or leftType->doCompare(INTEGER::getInstance()))
+			and (rightType->doCompare(REAL::getInstance()) or rightType->doCompare(INTEGER::getInstance())))
 				//is a number (real or int)
-				resType=realType;
+				resType = REAL::getInstance();
 		}
 
-		if(!(op.compare("div")) or !(op.compare("mod")) ){
+		else if(!(op.compare("div")) or !(op.compare("mod")) ){
 			//int operands-> int result
-			if(  leftType->doCompare(intType) and rightType->doCompare(intType))
+			if(  leftType->doCompare(INTEGER::getInstance()) and rightType->doCompare(INTEGER::getInstance()))
 				//is int
-				resType=intType;
+				resType = INTEGER::getInstance();
 		}
 
-		if(!(op.compare("=")) or !(op.compare("<>"))){
+		else if(!(op.compare("=")) or !(op.compare("<>"))){
 			// either int/real operands or any non-array type operands
 			// -> bool result
-			if(( leftType->doCompare(realType) or leftType->doCompare(intType))
-			and (rightType->doCompare(realType) or rightType->doCompare(intType)))
+			if(( leftType->doCompare(REAL::getInstance()) or leftType->doCompare(INTEGER::getInstance()))
+			and (rightType->doCompare(REAL::getInstance()) or rightType->doCompare(INTEGER::getInstance())))
 				// int/real operands
-				resType=boolType;
+				resType = BOOLEAN::getInstance();
 
 			else if(leftType->doCompare(rightType)
 			and leftType->get_name().compare("array") )
 				// same type and not an array operands
-				resType=boolType;
+				resType = BOOLEAN::getInstance();
 		}
 
-		if(!(op.compare("<=")) or !(op.compare(">=")) or !(op.compare("<"))
+		else if(!(op.compare("<=")) or !(op.compare(">=")) or !(op.compare("<"))
 				or !(op.compare(">")) ){
 			//real or int operands-> bool result
-			if( (leftType->doCompare(realType) or leftType->doCompare(intType))
-			and (rightType->doCompare(realType) or rightType->doCompare(intType)))
+			if( (leftType->doCompare(REAL::getInstance()) or leftType->doCompare(INTEGER::getInstance()))
+			and (rightType->doCompare(REAL::getInstance()) or rightType->doCompare(INTEGER::getInstance())))
 				//is a number (real or int)
-				resType=boolType;
+				resType = BOOLEAN::getInstance();
 		}
 
-		if(!(op.compare("and")) or !(op.compare("or")) ){
+		else if(!(op.compare("and")) or !(op.compare("or")) ){
 			//bool operands-> bool result
-			if(  leftType->doCompare(boolType) and rightType->doCompare(boolType))
+			if(  leftType->doCompare(BOOLEAN::getInstance()) and rightType->doCompare(BOOLEAN::getInstance()))
 				//is bool
-				resType=boolType;
+				resType = BOOLEAN::getInstance();
 		}
-		if(!(op.compare("[]"))){
+		else if(!(op.compare("[]"))){
 			if(!(leftType->get_name().compare("array"))){
-				if(rightType->doCompare(intType)){
-					ArrType* p=static_cast<ArrType*>(leftType);
+				if(rightType->doCompare(INTEGER::getInstance())){
+					SPtr<ArrType> p=std::static_pointer_cast<ArrType>(leftType);
 					resType=p->get_type();
 				}
 			}
@@ -105,13 +102,13 @@ void Op::sem(){
 	//UNOP
 	if(!(op.compare("+")) or !(op.compare("-")))
 		//real or int operand-> real or int result
-		if( leftType->doCompare(realType) or leftType->doCompare(intType) )
-			resType=leftType;
+		if( leftType->doCompare(REAL::getInstance()) or leftType->doCompare(INTEGER::getInstance()) )
+			resType = leftType;
 
-	if(!(op.compare("not"))){
+	else if(!(op.compare("not"))){
 		//bool operand-> bool result
-		if(leftType->doCompare(boolType) )
-			resType=boolType;
+		if(leftType->doCompare(BOOLEAN::getInstance()) )
+			resType = BOOLEAN::getInstance();
 	}
 	if(!resType){
 		/*TODO ERROR type mismatch*/
@@ -138,7 +135,7 @@ void Dereference::sem(){
 		expr=e;
 	}
 	expr->sem();
-	Type* ty=expr->get_type();
+	TSPtr ty(expr->get_type());
 	if(ty->get_name().compare("pointer")){
 		//TODO error incorrect type
 		std::cerr << "ERROR: Can only dereference pointer (not "<<
@@ -171,7 +168,7 @@ Expr* Dereference::simplify(int &count){
 void Brackets::sem(){
 	lvalue->sem();
 	expr->sem();
-	Type* l_ty = lvalue->get_type();
+	TSPtr l_ty (lvalue->get_type());
 	if(l_ty->get_name().compare("array")){
 		//TODO error incorrect type
 		std::cerr << "ERROR: Can only apply brakets to array (not "<<
@@ -188,8 +185,8 @@ void Brackets::sem(){
 void Let::sem(){
 	expr->sem();
 	lvalue->sem();
-	Type* lType = lvalue->get_type();
-	Type* rType = expr->get_type();
+	TSPtr lType (lvalue->get_type());
+	TSPtr rType(expr->get_type());
 	if(lType->doCompare(rType)) return;
 
 	different_types=true;
@@ -207,13 +204,14 @@ void Let::sem(){
 
 void LabelStmt::sem(){
 	st.label_lookup(label_id);
+	stmt->sem();
 }
 
 void Goto::sem(){
 	st.label_lookup(label_id);
 }
 
-bool Let::typecheck(Type* lType, Type* rType){
+bool Let::typecheck(TSPtr lType, TSPtr rType){
  /* is rType compatible for assignment with lType? */
 	// same types are compatible
 	if(lType->doCompare(rType)) return true;
@@ -223,16 +221,16 @@ bool Let::typecheck(Type* lType, Type* rType){
 		return true;
 
 	if(!(lType->get_name().compare("pointer")) and !(rType->get_name().compare("pointer"))){
-	 // ^array-type WITHOUT size of t is compatible with ^array-type WITH size of t
+	 // ^array-type WITH size of t is compatible with ^array-type WITHOUT size of t
 		// extract inner types from pointers
-		PtrType* lpType=static_cast<PtrType*>(lType);
-		PtrType* rpType=static_cast<PtrType*>(rType);
-		Type* linType=lpType->get_type();
-		Type* rinType=rpType->get_type();
+		SPtr<PtrType> lpType = std::static_pointer_cast<PtrType>(lType);
+		SPtr<PtrType> rpType = std::static_pointer_cast<PtrType>(rType);
+		TSPtr linType(lpType->get_type());
+		TSPtr rinType(rpType->get_type());
 		// try to cast inner types as arrays
 		if(!(linType->get_name().compare("array")) and !(rinType->get_name().compare("array"))){
-			ArrType* larrType=static_cast<ArrType*>(linType);
-			ArrType* rarrType=static_cast<ArrType*>(rinType);
+			SPtr<ArrType> larrType = std::static_pointer_cast<ArrType>(linType);
+			SPtr<ArrType> rarrType = std::static_pointer_cast<ArrType>(rinType);
 			// check sizes (left must be -1, right must be >0)
 			if(rarrType->get_size()!=-1 && larrType->get_size()==-1){
 				// extract inner types from arrays (must be same type)
@@ -247,7 +245,8 @@ bool Let::typecheck(Type* lType, Type* rType){
 
 void If::sem(){
 	expr->sem();
-	if(!(expr->get_type()==BOOLEAN::getInstance())){
+	TSPtr expr_t(expr->get_type());
+	if(!(expr_t == BOOLEAN::getInstance())){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
 			"ERROR: Incorrect type of expression in if statement!"
@@ -261,7 +260,8 @@ void If::sem(){
 
 void While::sem(){
 	expr->sem();
-	if(!(expr->get_type()==BOOLEAN::getInstance())){
+	TSPtr expr_t(expr->get_type());
+	if(!(expr_t == BOOLEAN::getInstance())){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
 			"ERROR: Incorrect type of expression in while statement!"
@@ -275,7 +275,8 @@ void New::sem(){
 	lvalue->sem();
 	if(expr){ // new array object
 		expr->sem();
-		if(!(expr->get_type()->doCompare(INTEGER::getInstance())) ){
+		TSPtr expr_t(expr->get_type());
+		if(!(expr_t == INTEGER::getInstance())){
 			/*TODO ERROR incorrect type*/
 			std::cerr<<
 				"ERROR: Incorrect type of expression in New statement!"
@@ -283,7 +284,7 @@ void New::sem(){
 			exit(1);
 		}
 		// lvalue must have type : ^array
-		Type* idType=lvalue->get_type();
+		TSPtr idType(lvalue->get_type());
 		// try to cast as pointer-type
 		if(idType->get_name().compare("pointer") ){
 			/*TODO ERROR incorrect type*/
@@ -293,8 +294,8 @@ void New::sem(){
 			exit(1);
 		}
 		// get inner type of pointer
-		PtrType* p=static_cast<PtrType*>(idType);
-		Type* t=p->get_type();
+		SPtr<PtrType> p = std::static_pointer_cast<PtrType>(idType);
+		TSPtr t(p->get_type());
 		// check if inner type is array-type
 		if(t->get_name().compare("array") ){
 			/*TODO ERROR incorrect type*/
@@ -306,7 +307,7 @@ void New::sem(){
 	}
 	else{ // new non-array object
 		// lvalue must have type: ^t
-		Type* idType=lvalue->get_type();
+		TSPtr idType(lvalue->get_type());
 		if(idType->get_name().compare("pointer") ){
 			/*TODO ERROR incorrect type*/
 			std::cerr<<
@@ -320,7 +321,8 @@ void New::sem(){
 void Dispose::sem(){
 	lvalue->sem();
 	// lvalue must be of type pointer
-	if(lvalue->get_type()->get_name().compare("pointer")){
+	TSPtr idType(lvalue->get_type());
+	if(idType->get_name().compare("pointer") ){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
 			"ERROR: Incorrect type of expression in Dispose statement!"
@@ -332,18 +334,19 @@ void Dispose::sem(){
 void DisposeArr::sem(){
 	lvalue->sem();
 	// lvalue must be of type: ^array
-	Type* t=lvalue->get_type();
+	TSPtr t(lvalue->get_type());
 	// try to cast as pointer
-	if(t->get_name().compare("pointer")){
+	if(t->get_name().compare("pointer") ){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
 			"ERROR: Incorrect type of expression in DisposeArr statement!"
 			<<std::endl;
 		exit(1);
 	}
-	PtrType *pt = static_cast<PtrType*>(t);
+	SPtr<PtrType > pt  = std::static_pointer_cast<PtrType>(t);
+	TSPtr inType(pt->get_type());
 	// check if inner type is array-type
-	if(pt->get_name().compare("array")){
+	if(inType->get_name().compare("array")){
 		/*TODO ERROR incorrect type*/
 		std::cerr<<
 			"ERROR: Incorrect type of expression in DisposeArr statement!"
@@ -381,7 +384,7 @@ void Body::sem(){
 	statements->sem();
 }
 
-void Procedure::sem_helper(bool isFunction, Type* ret_type){
+void Procedure::sem_helper(bool isFunction, TSPtr ret_type){
 	FunctionEntry* e = st.function_decl_lookup(id);
 	if(e and e->body->isDefined()){
 		if(isFunction){
@@ -393,7 +396,7 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 		exit(1);
 	}
 
-	std::vector<Type*> formal_types=formals->get_type();
+	std::vector<TSPtr> formal_types=formals->get_type();
 	std::vector<bool> by_ref=formals->get_by_ref();
 	if(e){ // existent previous declaration without body.
 		// must be same type of callable (function / procedure) with
@@ -405,8 +408,8 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 		// types and passing modes must match with previous declaration
 		//   (will fail if not).
 		if(isFunction){
-			FunctionType* func_type=static_cast<FunctionType*>(e->type);
-			Type* ret_t=func_type->get_ret_type();
+			SPtr<FunctionType> func_type = std::static_pointer_cast<FunctionType>(e->type);
+			TSPtr ret_t(func_type->get_ret_type());
 			if(!ret_t->doCompare(ret_type)){
 				std::cerr<<"Can't declare function "<<id<<" with different return type."<<std::endl;
 				exit(1);
@@ -415,7 +418,7 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 			func_type->check_passing(by_ref);
 		}
 		else{
-			ProcedureType* proc_type=static_cast<ProcedureType*>(e->type);
+			SPtr<ProcedureType> proc_type = std::static_pointer_cast<ProcedureType>(e->type);
 			proc_type->typecheck_args(formal_types);
 			proc_type->check_passing(by_ref);
 		}
@@ -423,17 +426,21 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 
 	if(!body->isDefined()){
 		// this is only subprogram header
-		CallableType *subp_type;
+		SPtr<CallableType> subp_type;
 		if(isFunction){
-			subp_type=new FunctionType(ret_type, formals);
+			subp_type = std::static_pointer_cast<CallableType>(
+				std::make_shared<FunctionType>(ret_type, formals)
+			);
 		}
 		else{
-			subp_type=new ProcedureType(formals);
+			subp_type = std::static_pointer_cast<CallableType>(
+				std::make_shared<ProcedureType>(formals)
+			);
 		}
 		st.insert_function(id,subp_type,body);
 		if(body->isLibrary()){
 			// library subprogram; setup type
-			type=subp_type;
+			type = subp_type;
 		}
 		// no body to sem; return.
 		return;
@@ -445,15 +452,19 @@ void Procedure::sem_helper(bool isFunction, Type* ret_type){
 		e->body->add_body(body);
 	}
 	else{ // first declaration of this subprogram
-		CallableType *subp_type;
+		SPtr<CallableType> subp_type;
 		if(isFunction){
-			subp_type=new FunctionType(ret_type, formals);
+			subp_type = std::static_pointer_cast<CallableType>(
+				std::make_shared<FunctionType>(ret_type, formals)
+			);
 		}
 		else{
-			subp_type=new ProcedureType(formals);
+			subp_type = std::static_pointer_cast<CallableType>(
+				std::make_shared<ProcedureType>(formals)
+			);
 		}
 		st.insert_function(id,subp_type,body);
-		type=subp_type;
+		type = subp_type;
 	}
 
 	// valid subprogram with body
@@ -476,14 +487,16 @@ void Function::sem(){
 }
 
 void Program::sem(){
-	st.openScope(name);
+	st.openScope("library");
+	// outer scope contains only library functions
 	// load library subprograms
 	for(auto p:library_subprograms){
 		p->sem();
 	}
+	st.openScope(name);
 	body->sem();
 	st.closeScope();
-	inp=fopen("pascal_input.inp", "r");
+	st.closeScope();
 }
 
 void ProcCall::sem(){
@@ -500,7 +513,7 @@ void FunctionCall::sem(){
 		std::cerr<<"Can't call procedure "<<name<<" as a function."<<std::endl;
 		exit(1);
 	}
-	type=static_cast<FunctionType*>(e->type)->get_ret_type();
+	type = std::static_pointer_cast<FunctionType>(e->type)->get_ret_type();
 }
 
 FunctionEntry* Call::check_passing(){
@@ -510,7 +523,7 @@ FunctionEntry* Call::check_passing(){
 	FunctionEntry* e = st.function_lookup(name);
 	body=e->body;
 	by_ref=e->type->get_by_ref();
-	std::vector<Type*> types=e->type->get_types();
+	std::vector<TSPtr> types=e->type->get_types();
 	for(uint i=0; i<types.size();i++){
 		Expr* expr=(*exprs)[i];
 		expr->sem();
@@ -519,14 +532,17 @@ FunctionEntry* Call::check_passing(){
 			exit(1);
 		}
 
-		Type* lType = types[i];
-		Type* rType = expr->get_type();
+		TSPtr lType(types[i]);
+		TSPtr rType(expr->get_type());
 
 		if(by_ref[i]){ // pass by-reference
 			// ^type of parameter must be compatible for assignment with
 			//    ^type of argument
-			if(Let::typecheck(new PtrType(lType),new PtrType(rType)))
-			continue;
+			SPtr<PtrType> lp (new PtrType(lType));
+			SPtr<PtrType> rp (new PtrType(rType));
+			if(Let::typecheck( lp, rp)){
+				continue;
+			}
 		}
 		else{ // pass by-value
 			// type of parameter must be compatible for assignment with
