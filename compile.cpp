@@ -10,13 +10,13 @@ static llvm::IRBuilder<> Builder(TheContext);
 static std::unique_ptr<llvm::Module> TheModule;
 
 // useful llvm types
-
 llvm::Type *i1=llvm::Type::getInt1Ty(TheContext);
 llvm::Type *i8=llvm::Type::getInt8Ty(TheContext);
 llvm::Type *i32=llvm::Type::getInt32Ty(TheContext);
 llvm::Type *i64=llvm::Type::getInt64Ty(TheContext);
 llvm::Type *doubleTy=llvm::Type::getDoubleTy(TheContext);
 llvm::Type *voidTy=llvm::Type::getVoidTy(TheContext);
+
 // Useful LLVM helper functions.
 static llvm::ConstantInt* c8_b(bool b) {
 	return llvm::ConstantInt::get(TheContext, llvm::APInt(8, b, true));
@@ -53,9 +53,10 @@ llvm::Type* CHARACTER::cgen(){
 }
 
 llvm::Type* ANY::cgen(){
-	// placeholder; will probably be changed by cast
-	return i32;
+	// will probably be changed by cast
+	return i8;
 }
+
 
 std::vector<llvm::Type*> CallableType::cgen_argTypes(){
 	std::vector<llvm::Type*> argTypes(formal_types.size());
@@ -176,8 +177,8 @@ llvm::Value* Sconst::getAddr(){
 
 
 llvm::Value* NilConst::cgen(){
-	// i32 by default; will probably be changed by cast
-	return llvm::Constant::getNullValue(i32);
+	// i8 by default; will probably be changed by cast
+	return llvm::Constant::getNullValue(llvm::PointerType::get(i8,0));
 }
 
 llvm::Value* Op::cgen(){
@@ -288,6 +289,15 @@ llvm::Value* Op::cgen(){
 		}
 		else{
 			// icmp; works for bool, ptr, int, char
+			if(!leftType->get_name().compare("pointer")){
+				// cast both pointers as i8*
+				leftValue = Builder.CreateBitCast(
+					leftValue,llvm::PointerType::get(i8,0),"lptrcast"
+				);
+				rightValue = Builder.CreateBitCast(
+					rightValue,llvm::PointerType::get(i8,0),"rptrcast"
+				);
+			}
 			llvm::Value* v = Builder.CreateICmpNE(leftValue, rightValue, "inetmp");
 			return Builder.CreateZExt(v,i8,"booltmp");
 		}
@@ -309,6 +319,15 @@ llvm::Value* Op::cgen(){
 		}
 		else{
 			// icmp; works for bool, ptr, int, char
+			if(!leftType->get_name().compare("pointer")){
+				// cast both pointers as i8*
+				leftValue = Builder.CreateBitCast(
+					leftValue,llvm::PointerType::get(i8,0),"lptrcast"
+				);
+				rightValue = Builder.CreateBitCast(
+					rightValue,llvm::PointerType::get(i8,0),"rptrcast"
+				);
+			}
 			llvm::Value* v = Builder.CreateICmpEQ(leftValue, rightValue, "ieqtmp");
 			return Builder.CreateZExt(v,i8,"booltmp");
 		}
@@ -614,6 +633,12 @@ void Let::cgen(){
 		// first convert integer to real
 		e = Builder.CreateSIToFP(e,doubleTy,"transtmp");
 	}
+
+	llvm::Type* tp = lvalue->get_type()->cgen();
+	if(tp->isPointerTy()){
+		e = Builder.CreateBitCast(e, tp);
+	}
+
 	llvm::Value *addr=lvalue->getAddr();
 	Builder.CreateStore(e, addr);
 }
