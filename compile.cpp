@@ -739,14 +739,20 @@ void New::cgen(){
 
 void Dispose::cgen(){
 	llvm::Value *ptr = Builder.CreateLoad(lvalue->getAddr(),"disptmp");
+	llvm::Type *t = lvalue->get_type()->cgen();
 	ptr = Builder.CreateBitCast(ptr, llvm::PointerType::get(i8, 0));
 	Builder.CreateCall(TheModule->getFunction("free"), std::vector<llvm::Value*> {ptr} );
+	llvm::Value *nil = llvm::Constant::getNullValue(t);
+	Builder.CreateStore(nil, lvalue->getAddr());
 }
 
 void DisposeArr::cgen(){
 	llvm::Value *ptr = Builder.CreateLoad(lvalue->getAddr(),"disptmp");
+	llvm::Type *t = lvalue->get_type()->cgen();
 	ptr = Builder.CreateBitCast(ptr, llvm::PointerType::get(i8, 0));
 	Builder.CreateCall(TheModule->getFunction("free"), std::vector<llvm::Value*> {ptr} );
+	llvm::Value *nil = llvm::Constant::getNullValue(t);
+	Builder.CreateStore(nil, lvalue->getAddr());
 }
 
 void StmtList::cgen(){
