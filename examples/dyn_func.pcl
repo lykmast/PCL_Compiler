@@ -38,4 +38,5 @@ begin
 		writeChar('\n');
 		x:=x+1;
 	end;
+	dispose [] dyn_arr;
 end.

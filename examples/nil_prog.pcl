@@ -1,0 +1,9 @@
+program nil_prog;
+var i: ^ integer;
+begin
+	i:=nil;
+	if i=nil then
+		writeString("problem:\\\n")
+	else
+		writeString("ok\n");
+end.

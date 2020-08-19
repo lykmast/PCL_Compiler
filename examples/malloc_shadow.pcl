@@ -1,0 +1,23 @@
+program shadow;
+function malloc(i: integer): integer;
+begin
+	result:=i+1;
+end;
+function free(i: integer): integer;
+begin
+	result:=i-1;
+end;
+var i: integer;
+	y: ^ integer;
+begin
+	new y;
+	y^:=1;
+	i:=10;
+	writeInteger(malloc(i));
+	writeChar(',');
+	writeInteger(free(i));
+	writeChar(',');
+	writeInteger(y^);
+	writeChar('\n');
+	dispose y;
+end.
