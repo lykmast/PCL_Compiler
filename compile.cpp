@@ -62,6 +62,7 @@ std::vector<llvm::Type*> CallableType::cgen_argTypes(){
 	std::vector<llvm::Type*> argTypes(formal_types.size());
 	for(uint i=0; i<formal_types.size();i++){
 		if(by_ref[i]){
+			// by reference arguments need to have pointer type.
 			if(!formal_types[i]->get_name().compare("array")){
 				// convert array by reference to pointer to element
 				argTypes[i] = llvm::PointerType::get(
@@ -77,6 +78,7 @@ std::vector<llvm::Type*> CallableType::cgen_argTypes(){
 		}
 	}
 	for(uint i=0; i<outer_types.size();i++){
+		// all outer arguments are passed by reference
 		if(!outer_types[i]->get_name().compare("array")){
 			// convert array by reference to pointer to element
 			argTypes.push_back(
@@ -166,9 +168,6 @@ llvm::Value* Sconst::cgen(){
 	//4. Return a cast to an i8*
 	return globalDeclaration;
 
-	// return Builder.CreateGlobalStringPtr(str);
-
-	// return llvm::ConstantDataArray::getString(TheContext, str);
 }
 
 llvm::Value* Sconst::getAddr(){
@@ -177,7 +176,7 @@ llvm::Value* Sconst::getAddr(){
 
 
 llvm::Value* NilConst::cgen(){
-	// i8 by default; will probably be changed by cast
+	// i8* by default; will probably be changed by cast
 	return llvm::Constant::getNullValue(llvm::PointerType::get(i8,0));
 }
 
@@ -438,7 +437,6 @@ llvm::Value* Op::cgen(){
 		/* no-short-circuit block */
 		ct.setCurrentBB(NoShortCircuitBB);
 		Builder.SetInsertPoint(NoShortCircuitBB);
-		// TODO ct.setCurrentBlock(NoShortCircuit);
 		rightValue=right->cgen();
 		ret = Builder.CreateAnd(leftValue,rightValue,"andnsctmp");
 		Builder.CreateBr(MergeBB);
@@ -529,18 +527,26 @@ llvm::Value* Id::cgen(){
 llvm::Value* Reference::cgen(){
 	llvm::Value* alloca = lvalue->getAddr();
 	if(count){
+		// count means it is really a reference;
+		//   return address.
 		return alloca;
 	}
+	// false reference (canceled by dereference).
+	//   return value (with load).
 	return Builder.CreateLoad(alloca, "reftmp");
 }
 
 
 llvm::Value* Dereference::cgen(){
-	llvm::Value* alloca = expr->cgen();
+	llvm::Value* val = expr->cgen();
 	if(count){
-		return Builder.CreateLoad(alloca, "dereftmp");
+		// count means it is really a dereference;
+		//   return address.
+		return Builder.CreateLoad(val, "dereftmp");
 	}
-	return alloca;
+	// false reference (canceled by dereference).
+	//   return value.
+	return val;
 }
 
 llvm::Value* Brackets::cgen(){
@@ -551,16 +557,17 @@ llvm::Value* Brackets::cgen(){
 	llvm::Value* ptr;
 	if(static_cast<llvm::PointerType*>(arr->getType())
 			->getElementType()->isArrayTy()){
-		// GEP needs first a 0 index because arr is pointer (alloca) to array
+		// GEP needs first a 0 index because arr is pointer (alloca) to array.
 		ptr = Builder.CreateGEP( arr, std::vector<llvm::Value*> {c32(0),index_v});
 	}
 	else{
-		// array reference is pointer so needs only one index
+		// array reference is pointer to element so needs only one index.
 		ptr = Builder.CreateGEP(
 			arr, std::vector<llvm::Value*> {index_v}
 		);
 	}
 	if(arrTy->is_1D()){
+		// in 1D array cgen returns value of element.
 		return Builder.CreateLoad(ptr, "bracktmp");
 	}
 	return ptr;
@@ -569,9 +576,11 @@ llvm::Value* Brackets::cgen(){
 
 llvm::Value* Dereference::getAddr(){
 	if(count){
+		// true dereference; return address (value of pointer).
 		return expr->cgen();
 	}
 	else{
+		// false dereference; return address of lvalue.
 		return static_cast<LValue*>(expr)->getAddr();
 	}
 }
@@ -595,11 +604,11 @@ llvm::Value* Brackets::getAddr(){
 
 	if(static_cast<llvm::PointerType*>(arr->getType())
 			->getElementType()->isArrayTy()){
-		// GEP needs first a 0 index because arr is pointer (alloca) to array
+		// GEP needs first a 0 index because arr is pointer (alloca) to array.
 		ptr = Builder.CreateGEP( arr, std::vector<llvm::Value*> {c32(0),index_v});
 	}
 	else{
-		// array reference is pointer so needs only one index
+		// array reference is pointer to element so needs only one index.
 		ptr = Builder.CreateGEP(
 			arr, std::vector<llvm::Value*> {index_v}
 		);
@@ -609,17 +618,22 @@ llvm::Value* Brackets::getAddr(){
 
 void LabelStmt::cgen(){
 	llvm::Function* TheFunction = ct.getFunction();
+	// get LabelBB from cgen table (has been created in LabelDecl).
 	llvm::BasicBlock *LabelBB = ct.label_lookup(label_id);
 	TheFunction->getBasicBlockList().push_back(LabelBB);
+	// new block-> explicit jump.
 	Builder.CreateBr(LabelBB);
 	ct.setCurrentBB(LabelBB);
 	Builder.SetInsertPoint(LabelBB);
+	// cgen first stmt.
 	stmt->cgen();
 }
 
 void Goto::cgen(){
+	// get label block from cgen table (has been created in LabelDecl).
+	// unconditional branch to label block.
 	Builder.CreateBr(ct.label_lookup(label_id));
-	// create new garbage block (is unreachable)
+	// create new garbage block (is unreachable).
 	llvm::Function* TheFunction=ct.getFunction();
 	llvm::BasicBlock *BB =
 		llvm::BasicBlock::Create(TheContext, "garb", TheFunction);
@@ -636,6 +650,8 @@ void Let::cgen(){
 
 	llvm::Type* tp = lvalue->get_type()->cgen();
 	if(tp->isPointerTy()){
+		// pointer value needs to be bitcast
+		//   in case of nil (i8*) to lvalue type.
 		e = Builder.CreateBitCast(e, tp);
 	}
 
@@ -675,15 +691,12 @@ void If::cgen(){
 	TheFunction->getBasicBlockList().push_back(MergeBB);
 	ct.setCurrentBB(MergeBB);
 	Builder.SetInsertPoint(MergeBB);
-	//TODO set current block at ct ?
 }
 
 
 void While::cgen(){
 	llvm::Function* TheFunction = ct.getFunction();
 
-	// Create blocks for the then and else cases.  Insert the 'then' block at the
-	// end of the function.
 	llvm::BasicBlock *BeforeBB =
 		llvm::BasicBlock::Create(TheContext, "before", TheFunction);
 	llvm::BasicBlock *LoopBB =
@@ -711,37 +724,46 @@ void While::cgen(){
 	TheFunction->getBasicBlockList().push_back(AfterBB);
 	ct.setCurrentBB(AfterBB);
 	Builder.SetInsertPoint(AfterBB);
-	//TODO set current block at ct ?
 }
 
 void New::cgen(){
 	llvm::DataLayout* DL = new llvm::DataLayout(&(*TheModule));
-	// llvm::DataLayout* DL = new llvm::DataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128");
 	// get size of type to malloc
 	llvm::Type* ptrTy = lvalue->get_type()->cgen();
 	llvm::Type* ty = ptrTy->getPointerElementType();
 	llvm::Value *AllocSize;
 	if(expr){
-		// array
+		/* array */
 		ty = ty->getArrayElementType();
+		// size of element.
 		AllocSize = c64(DL->getTypeAllocSize(ty));
 		llvm::Value* cast64 = Builder.CreateZExt(expr->cgen(),i64,"cast");
+		// total allocation size is size of array * size of element.
 		AllocSize=Builder.CreateMul(cast64, AllocSize);
 	}
 	else{
+		/* simple pointer */
 		AllocSize = c64(DL->getTypeAllocSize(ty));
 	}
 	llvm::Value *ptr = Builder.CreateCall(
 		TheModule->getFunction("malloc"), std::vector<llvm::Value*> {AllocSize});
+	// cast malloc pointer to requested type.
 	ptr = Builder.CreateBitCast(ptr, ptrTy);
+	// store pointer value to lvalue address.
 	Builder.CreateStore(ptr,lvalue->getAddr());
 }
 
 void Dispose::cgen(){
 	llvm::Value *ptr = Builder.CreateLoad(lvalue->getAddr(),"disptmp");
 	llvm::Type *t = lvalue->get_type()->cgen();
+	// bitcast ptr to i8* to pass as argument to "free" function.
 	ptr = Builder.CreateBitCast(ptr, llvm::PointerType::get(i8, 0));
-	Builder.CreateCall(TheModule->getFunction("free"), std::vector<llvm::Value*> {ptr} );
+	// call "free" function from TheModule.
+	Builder.CreateCall(
+		TheModule->getFunction("free"),
+		std::vector<llvm::Value*> {ptr}
+	);
+	// store nil in free'd pointer. nil is created with type of ptr.
 	llvm::Value *nil = llvm::Constant::getNullValue(t);
 	Builder.CreateStore(nil, lvalue->getAddr());
 }
@@ -749,43 +771,55 @@ void Dispose::cgen(){
 void DisposeArr::cgen(){
 	llvm::Value *ptr = Builder.CreateLoad(lvalue->getAddr(),"disptmp");
 	llvm::Type *t = lvalue->get_type()->cgen();
+	// bitcast ptr to i8* to pass as argument to "free" function.
 	ptr = Builder.CreateBitCast(ptr, llvm::PointerType::get(i8, 0));
+	// call "free" function from TheModule.
 	Builder.CreateCall(TheModule->getFunction("free"), std::vector<llvm::Value*> {ptr} );
+	// store nil in free'd pointer. nil is created with type of ptr.
 	llvm::Value *nil = llvm::Constant::getNullValue(t);
 	Builder.CreateStore(nil, lvalue->getAddr());
 }
 
 void StmtList::cgen(){
+	// cgen all stmts in list.
 	for(auto const &p: list){
 		p->cgen();
 	}
 }
 
 void DeclList::cgen(){
+	// cgen all decls in list.
 	for(auto const &p: list){
 		p->cgen();
 	}
 }
 
 void VarDecl::cgen(){
+	// allocate var according to type.
 	llvm::AllocaInst* alloca = Builder.CreateAlloca(type->cgen(), nullptr, id);
+	// insert alloca to cgen table.
 	ct.insert(id, alloca);
 }
 
 void LabelDecl::cgen(){
+	// create label block.
 	llvm::BasicBlock *LabelBB =
 		llvm::BasicBlock::Create(TheContext, id);
+	// insert label block to cgen table.
 	ct.insert_label(id, LabelBB);
 }
 
 void Body::cgen(){
 	if(defined){
+		// body is not empty (full subprogram declaration).
 		declarations->cgen();
 		statements->cgen();
 	}
 	else if(!library){
+		// body is empty and subprogram is not library function.
 		std::cerr<<"Cgen:: Incomplete declaration."<<std::endl;
 	}
+	// body of library subprogram is located in library implementation file.
 }
 
 void Procedure::cgen(){
@@ -800,14 +834,17 @@ void Procedure::cgen(){
 	llvm::Function* F = llvm::Function::Create(
 		FT, llvm::Function::ExternalLinkage, call_name, TheModule.get()
 	);
+	// insert function to current scope of cgen table.
 	ct.insert_function(id, F);
 	if(body->isLibrary()) return;
 
 	ct.openScope(F);
+	// open new scope for subprogram.
 	std::vector<std::string> formal_vars = type->get_formal_vars();
 	std::vector<std::string> outer_vars = type->get_outer_vars();
 	std::vector<bool> by_ref = type->get_by_ref();
 
+	// create function entry block
 	llvm::BasicBlock *BB = llvm::BasicBlock::Create(TheContext, "entry", F);
 	ct.setCurrentBB(BB);
 	// create function exit block
@@ -829,18 +866,29 @@ void Procedure::cgen(){
 	unsigned Idx_outer=0;
 	unsigned fs=formal_vars.size();
 	unsigned os=outer_vars.size();
+
 	for(auto &Arg : F->args()){
 		llvm::AllocaInst* alloca;
 		if(Idx_formal<fs){
+			/* formal argument */
+
+			// set name.
 			Arg.setName(formal_vars[Idx_formal]);
+			// allocate space according to type.
 			alloca = Builder.CreateAlloca(Arg.getType(), nullptr, Arg.getName());
+			// insert alloca in cgen table.
 			ct.insert(Arg.getName(), alloca, by_ref[Idx_formal]);
 			Idx_formal++;
 		}
 		else if(Idx_outer<os){
+			/* outer argument (from outer scope). */
+
+			// set name.
 			Arg.setName(outer_vars[Idx_outer++]);
+			// allocate space according to type.
 			alloca = Builder.CreateAlloca(Arg.getType(), nullptr, Arg.getName());
-			// all outer arguments are passed by reference.
+			// insert alloca in cgen table.
+			//  true because all outer arguments are passed by reference.
 			ct.insert(Arg.getName(), alloca, true);
 		}
 		else{
@@ -852,17 +900,19 @@ void Procedure::cgen(){
 	}
 
 	body->cgen();
-	// return
 	// exit block
 	Builder.CreateBr(ExitBB);
 	F->getBasicBlockList().push_back(ExitBB);
 	ct.setCurrentBB(ExitBB);
 	Builder.SetInsertPoint(ExitBB);
+	/* return */
 	if(isFunction){
+		// load and return result.
 		llvm::Value* res = Builder.CreateLoad(result_alloca, "result");
 		Builder.CreateRet(res);
 	}
 	else{
+		// void return for procedure.
 		Builder.CreateRetVoid();
 	}
 	ct.closeScope();
@@ -872,24 +922,27 @@ void Procedure::cgen(){
 
 void Return::cgen(){
 	// unconditional jump to the exit block
-	// current block is ended by ret.
+	// current block is ended.
 	Builder.CreateBr(ct.getExitBB());
-	// create new garbage block (is unreachable)
+	// create new garbage block (is unreachable).
 	llvm::Function* TheFunction=ct.getFunction();
 	llvm::BasicBlock *BB =
 		llvm::BasicBlock::Create(TheContext, "garb", TheFunction);
 	ct.setCurrentBB(BB);
 	Builder.SetInsertPoint(BB);
 }
+
+
 static void create_mem_funcs(){
-	// create malloc
+	/* create malloc and free declarations */
+	// create 'i8* malloc(i64)'
 	llvm::FunctionType* malloc_type = llvm::FunctionType::get(
 		llvm::PointerType::get(i8, 0), std::vector<llvm::Type *>{i64}, false
 	);
 	llvm::Function* malloc_f = llvm::Function::Create(
 		malloc_type, llvm::Function::ExternalLinkage, "malloc", TheModule.get()
 	);
-	// create free
+	// create 'void free(i8*)'
 	llvm::FunctionType* free_type = llvm::FunctionType::get(
 		voidTy, llvm::PointerType::get(i8, 0), false
 	);
@@ -899,6 +952,7 @@ static void create_mem_funcs(){
 }
 void Program::cgen(){
 	TheModule = llvm::make_unique<llvm::Module>(filename, TheContext);
+	// 'i32 main()'
 	llvm::FunctionType* main_t = llvm::FunctionType::get(
 		i32, std::vector<llvm::Type *>{}, false
 	);
@@ -908,13 +962,15 @@ void Program::cgen(){
 
 	ct.openScope();
 	// outer scope contains only library functions
-	// load library subprograms
+	// declare memory functions.
+	create_mem_funcs();
+	// load library subprograms.
 	for(auto p:library_subprograms){
 		p->cgen();
 	}
 
 	ct.openScope(main_f);
-	create_mem_funcs();
+	// main scope.
 	llvm::BasicBlock *BB = llvm::BasicBlock::Create(TheContext, "entry", main_f);
 	ct.setCurrentBB(BB);
 	Builder.SetInsertPoint(BB);
