@@ -10,6 +10,7 @@ Contains class declarations for AST and all
 #include <vector>
 #include <string>
 #include <cstring>
+#include <sstream>
 #include "pcl_lexer.hpp"
 // --------LLVM includes---------
 #include "llvm/ADT/APFloat.h"
@@ -23,6 +24,13 @@ Contains class declarations for AST and all
 #include "llvm/IR/Type.h"
 #include "llvm/IR/Verifier.h"
 #include <llvm/IR/Value.h>
+struct symbol_loc {
+	int first_line;
+	int first_column;
+	int last_line;
+	int last_column;
+};
+
 class Type;
 
 template<class T>
@@ -35,21 +43,23 @@ struct FunctionEntry;
 
 class AST {
 public:
-	void add_parse_info(int no, char* buf,char* txt){
-		lineno=no;
+	void add_parse_info(struct symbol_loc loc, char* buf){
+		location = loc;
 		strncpy(linebuf,buf,500);
-		strncpy(text,txt,100);
 	}
 	virtual ~AST() {}
 	virtual void printOn(std::ostream &out) const {out<<"";}
 	virtual void sem(){}
-	void report_error(char*msg){
-		// lyyerror(lineno,linebuf,text,msg);
+	void report_error( const char*msg){
+		std::cerr<<
+			location.first_line<<","<< location.first_column << "-" <<
+			location.last_line<<","<< location.last_column <<": " <<
+			msg << " in line:\n"<<linebuf<<std::endl;
+		exit(1);
 	}
 protected:
-	int lineno;
-	char linebuf[500];
-	char text[100];
+	struct symbol_loc location{0,0,0,0};
+	char linebuf[500]="";
 };
 
 template<class T>
@@ -786,6 +796,7 @@ protected:
 	void add_outer();
 
 	llvm::Value* cgen_common();
+	virtual void report_error_from_child(const char* msg)=0;
 };
 
 class ProcCall: public Call, public Stmt{
@@ -794,6 +805,9 @@ public:
 	virtual void sem() override;
 	virtual void printOn(std::ostream &out) const override;
 	virtual void cgen() override;
+	virtual void report_error_from_child(const char* msg) override{
+		this->report_error(msg);
+	}
 };
 
 class FunctionCall: public Call, public Expr{
@@ -805,6 +819,9 @@ public:
 	virtual void printOn(std::ostream &out) const override ;
 
 	virtual llvm::Value* cgen() override;
+	virtual void report_error_from_child(const char* msg) override{
+		this->report_error(msg);
+	}
 private:
 	TSPtr type;
 };

@@ -509,7 +509,7 @@ llvm::Value* Op::cgen(){
 		return Builder.CreateZExt(v,i8,"booltmp");
 	}
 	else{
-		std::cerr<<"Cgen::Internal Error: Invalid BinOp."<<std::endl;
+		this->report_error("Cgen::Internal Error: Invalid BinOp.");
 		exit(1);
 	}
 }
@@ -817,7 +817,7 @@ void Body::cgen(){
 	}
 	else if(!library){
 		// body is empty and subprogram is not library function.
-		std::cerr<<"Cgen:: Incomplete declaration."<<std::endl;
+		this->report_error("Cgen:: Incomplete declaration.");
 	}
 	// body of library subprogram is located in library implementation file.
 }
@@ -892,8 +892,8 @@ void Procedure::cgen(){
 			ct.insert(Arg.getName(), alloca, true);
 		}
 		else{
-			std::cerr<<"Code generation error:"
-			" number of arguments in function"<<std::endl;
+			this->report_error("Code generation error:"
+			" number of arguments in function");
 		}
 		// Store the initial value into the alloca.
 		Builder.CreateStore(&Arg, alloca);

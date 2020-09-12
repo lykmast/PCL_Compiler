@@ -2,8 +2,6 @@
 pcl_lexer.l
 Lexical parser for pcl compiler in flex
 ------------------------------------------ */
-%option noyywrap
-%option yylineno
 %x C_COMMENT
 %x STRING
 %x CHARACTER
@@ -16,13 +14,28 @@ Lexical parser for pcl compiler in flex
 	#include <string>
 %}
 
+%option noyywrap
+
 
 %{
 	char c;
 	std::string *s;
 	bool added;
-	char msg[100];
-	char linebuf[500];
+	extern char msg[100];
+	extern char linebuf[500];
+	extern struct symbol_loc location;
+	#define YY_USER_ACTION \
+    location.first_line = location.last_line; \
+    location.first_column = location.last_column; \
+    for(int i = 0; yytext[i] != '\0'; i++) { \
+        if(yytext[i] == '\n') { \
+            location.last_line++; \
+            location.last_column = 0; \
+        } \
+        else { \
+            location.last_column++; \
+        } \
+    }
 %}
 L [a-zA-Z]
 D [0-9]
@@ -111,7 +124,10 @@ W [ \t\r\n]
 
 void yyerror(const char *msg) {
 
-	fprintf(stderr, "%d: %s at %s in line:\n %s\n", yylineno,msg,yytext,linebuf);
+	fprintf(stderr, "%d,%d-%d,%d: %s at %s in line:\n %s\n",
+		location.first_line, location.first_column,
+		location.last_line, location.last_column,
+		msg,yytext,linebuf);
 	exit(1);
 }
 

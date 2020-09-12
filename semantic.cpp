@@ -11,7 +11,9 @@ void Id::sem(){
 	SymbolEntry *e = st.lookup(name);
 	if(!e){
 		//TODO throw error variable not declared
-		std::cerr<<"Id '"<<name<<"' not declared"<<std::endl;
+		std::ostringstream stream;
+		stream<<"Id '"<<name<<"' not declared";
+		this->report_error(stream.str().c_str());
 		exit(1);
 	}
 	type = e->type;
@@ -94,7 +96,7 @@ void Op::sem(){
 		}
 		if(!resType){
 			/*TODO ERROR type mismatch*/
-			std::cerr<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+			this->report_error("ERROR: Type mismatch in Op->sem");
 			exit(1);
 		}
 		return;
@@ -112,7 +114,7 @@ void Op::sem(){
 	}
 	if(!resType){
 		/*TODO ERROR type mismatch*/
-		std::cerr<<"ERROR: Type mismatch in Op->sem"<<std::endl;
+		this->report_error("ERROR: Type mismatch in Op->sem");
 		exit(1);
 	}
 	return;
@@ -138,8 +140,10 @@ void Dereference::sem(){
 	TSPtr ty(expr->get_type());
 	if(ty->get_name().compare("pointer")){
 		//TODO error incorrect type
-		std::cerr << "ERROR: Can only dereference pointer (not "<<
-		ty->get_name()<<")" <<std::endl;
+		std::ostringstream stream;
+		stream << "ERROR: Can only dereference pointer (not "<<
+				ty->get_name()<<")" ;
+this->report_error(stream.str().c_str());
 	}
 }
 
@@ -171,13 +175,17 @@ void Brackets::sem(){
 	TSPtr l_ty (lvalue->get_type());
 	if(l_ty->get_name().compare("array")){
 		//TODO error incorrect type
-		std::cerr << "ERROR: Can only apply brakets to array (not "<<
-		l_ty->get_name()<<")" <<std::endl;
+		std::ostringstream stream;
+		stream << "ERROR: Can only apply brakets to array (not "<<
+				l_ty->get_name()<<")" ;
+this->report_error(stream.str().c_str());
 		exit(1);
 	}
 	if(!expr->get_type()->doCompare(INTEGER::getInstance())){
 		//TODO error incorrect type for array index should be int
-		std::cerr << "ERROR: Array index should be int!"<<std::endl;
+		std::ostringstream stream;
+		stream << "ERROR: Array index should be int!";
+		this->report_error(stream.str().c_str());
 		exit(1);
 	}
 }
@@ -192,7 +200,9 @@ void Let::sem(){
 	different_types=true;
 	if(!typecheck(lType,rType)){
 		/*TODO error type mismatch*/
-		std::cerr<<"ERROR: Type mismatch in let!"<<std::endl;
+		std::ostringstream stream;
+		stream<<"ERROR: Could not assign type "<<*rType<<"to type "<<*lType;
+		this->report_error(stream.str().c_str());
 		exit(1);
 	}
 	if(rType->doCompare(INTEGER::getInstance())){
@@ -248,9 +258,9 @@ void If::sem(){
 	TSPtr expr_t(expr->get_type());
 	if(!(expr_t == BOOLEAN::getInstance())){
 		/*TODO ERROR incorrect type*/
-		std::cerr<<
+		this->report_error(
 			"ERROR: Incorrect type of expression in if statement!"
-			<<std::endl;
+			);
 			exit(1);
 	}
 	stmt1->sem();
@@ -263,9 +273,9 @@ void While::sem(){
 	TSPtr expr_t(expr->get_type());
 	if(!(expr_t == BOOLEAN::getInstance())){
 		/*TODO ERROR incorrect type*/
-		std::cerr<<
+		this->report_error(
 			"ERROR: Incorrect type of expression in while statement!"
-			<<std::endl;
+			);
 		exit(1);
 	}
 	stmt->sem();
@@ -278,9 +288,9 @@ void New::sem(){
 		TSPtr expr_t(expr->get_type());
 		if(!(expr_t == INTEGER::getInstance())){
 			/*TODO ERROR incorrect type*/
-			std::cerr<<
+			this->report_error(
 				"ERROR: Incorrect type of expression in New statement!"
-				<<std::endl;
+				);
 			exit(1);
 		}
 		// lvalue must have type : ^array
@@ -288,9 +298,9 @@ void New::sem(){
 		// try to cast as pointer-type
 		if(idType->get_name().compare("pointer") ){
 			/*TODO ERROR incorrect type*/
-			std::cerr<<
+			this->report_error(
 				"ERROR: Incorrect type of expression in New statement!"
-				<<std::endl;
+				);
 			exit(1);
 		}
 		// get inner type of pointer
@@ -299,9 +309,9 @@ void New::sem(){
 		// check if inner type is array-type
 		if(t->get_name().compare("array") ){
 			/*TODO ERROR incorrect type*/
-			std::cerr<<
+			this->report_error(
 				"ERROR: Incorrect type of expression in New statement!"
-				<<std::endl;
+				);
 			exit(1);
 		}
 	}
@@ -310,9 +320,9 @@ void New::sem(){
 		TSPtr idType(lvalue->get_type());
 		if(idType->get_name().compare("pointer") ){
 			/*TODO ERROR incorrect type*/
-			std::cerr<<
+			this->report_error(
 				"ERROR: Incorrect type of expression in New statement!"
-				<<std::endl;
+				);
 			exit(1);
 		}
 	}
@@ -324,9 +334,9 @@ void Dispose::sem(){
 	TSPtr idType(lvalue->get_type());
 	if(idType->get_name().compare("pointer") ){
 		/*TODO ERROR incorrect type*/
-		std::cerr<<
+		this->report_error(
 			"ERROR: Incorrect type of expression in Dispose statement!"
-			<<std::endl;
+			);
 		exit(1);
 	}
 }
@@ -338,9 +348,9 @@ void DisposeArr::sem(){
 	// try to cast as pointer
 	if(t->get_name().compare("pointer") ){
 		/*TODO ERROR incorrect type*/
-		std::cerr<<
+		this->report_error(
 			"ERROR: Incorrect type of expression in DisposeArr statement!"
-			<<std::endl;
+			);
 		exit(1);
 	}
 	SPtr<PtrType > pt  = std::static_pointer_cast<PtrType>(t);
@@ -348,9 +358,9 @@ void DisposeArr::sem(){
 	// check if inner type is array-type
 	if(inType->get_name().compare("array")){
 		/*TODO ERROR incorrect type*/
-		std::cerr<<
+		this->report_error(
 			"ERROR: Incorrect type of expression in DisposeArr statement!"
-			<<std::endl;
+			);
 		exit(1);
 	}
 }
@@ -388,10 +398,14 @@ void Procedure::sem_helper(bool isFunction, TSPtr ret_type){
 	FunctionEntry* e = st.function_decl_lookup(id);
 	if(e and e->body->isDefined()){
 		if(isFunction){
-			std::cerr<<"Function "<<id<<" already fully declared in this scope."<<std::endl;
+			std::ostringstream stream;
+			stream<<"Function "<<id<<" already fully declared in this scope.";
+			this->report_error(stream.str().c_str());
 		}
 		else{
-			std::cerr<<"Procedure "<<id<<" already fully declared in this scope."<<std::endl;
+			std::ostringstream stream;
+			stream<<"Procedure "<<id<<" already fully declared in this scope.";
+			this->report_error(stream.str().c_str());
 		}
 		exit(1);
 	}
@@ -402,7 +416,9 @@ void Procedure::sem_helper(bool isFunction, TSPtr ret_type){
 		// must be same type of callable (function / procedure) with
 		//   with previous declaration.
 		if(e->type->get_name().compare(decl_type)){
-			std::cerr<<"Previous declaration of "<<id<<" is not a "<<decl_type<<"."<<std::endl;
+			std::ostringstream stream;
+			stream<<"Previous declaration of "<<id<<" is not a "<<decl_type<<".";
+			this->report_error(stream.str().c_str());
 			exit(1);
 		}
 		// types and passing modes must match with previous declaration
@@ -411,7 +427,9 @@ void Procedure::sem_helper(bool isFunction, TSPtr ret_type){
 			SPtr<FunctionType> func_type = std::static_pointer_cast<FunctionType>(e->type);
 			TSPtr ret_t(func_type->get_ret_type());
 			if(!ret_t->doCompare(ret_type)){
-				std::cerr<<"Can't declare function "<<id<<" with different return type."<<std::endl;
+				std::ostringstream stream;
+				stream<<"Can't declare function "<<id<<" with different return type.";
+				this->report_error(stream.str().c_str());
 				exit(1);
 			}
 			func_type->typecheck_args(formal_types);
@@ -502,7 +520,9 @@ void Program::sem(){
 void ProcCall::sem(){
 	FunctionEntry* e =check_passing();
 	if(e->type->get_name().compare("procedure")){
-		std::cerr<<"Can't call function "<<name<<" as a procedure."<<std::endl;
+		std::ostringstream stream;
+		stream<<"Can't call function "<<name<<" as a procedure.";
+		this->report_error(stream.str().c_str());
 		exit(1);
 	}
 }
@@ -510,7 +530,9 @@ void ProcCall::sem(){
 void FunctionCall::sem(){
 	FunctionEntry* e = check_passing();
 	if(e->type->get_name().compare("function")){
-		std::cerr<<"Can't call procedure "<<name<<" as a function."<<std::endl;
+		std::ostringstream stream;
+		stream<<"Can't call procedure "<<name<<" as a function.";
+		this->report_error(stream.str().c_str());
 		exit(1);
 	}
 	type = std::static_pointer_cast<FunctionType>(e->type)->get_ret_type();
@@ -528,7 +550,7 @@ FunctionEntry* Call::check_passing(){
 		Expr* expr=(*exprs)[i];
 		expr->sem();
 		if (by_ref[i] and not expr->isLValue()){
-			std::cerr<<"Argument should be an lvalue expression."<<std::endl;
+			this->report_error_from_child("Argument should be an lvalue expression.");
 			exit(1);
 		}
 
@@ -552,7 +574,10 @@ FunctionEntry* Call::check_passing(){
 		}
 
 		/*TODO error type mismatch*/
-		std::cerr<<"ERROR: Type mismatch in call! ("<<"expected "<<*lType<<" but received "<<*rType<<" instead."<<std::endl;
+		std::ostringstream stream;
+
+		stream<<"ERROR: Type mismatch in call! ("<<"expected "<<*lType<<" but received "<<*rType<<" instead.";
+		this->report_error_from_child(stream.str().c_str());
 		exit(1);
 	}
 
@@ -578,7 +603,7 @@ bool Body::isDefined(){
 
 void Procedure::add_body(Body* bod){
 	if(body->isDefined()){
-		std::cerr<<id<<" already has body."<<std::endl;
+		std::ostringstream stream;
 		exit(1);
 	}
 	body->add_body(bod);

@@ -122,8 +122,7 @@ public:
 			// return newly added entry on current scope
 			return scopes.back().lookup(name);
 		}
-		std::cerr << "Unknown variable " << name << std::endl;
-		exit(1);
+		return nullptr;
 	}
 
 	FunctionEntry *function_lookup(std::string name) {
