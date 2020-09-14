@@ -32,7 +32,8 @@ void NilConst::printOn(std::ostream &out) const {
 	out << "NilConst("<<*type<< ")";
 }
 
-Sconst::Sconst(std::string s):str(s){}
+// LValue(false,true): Sconst is not dynamic but constant.
+Sconst::Sconst(std::string s):LValue(false,true),str(s){}
 void Sconst::printOn(std::ostream &out) const {
 	out<< "Sconst("<<str<<")";
 }
@@ -81,7 +82,9 @@ void Dereference::printOn(std::ostream &out) const {
 }
 
 
-Brackets::Brackets(LValue *lval, Expr* e):lvalue(lval),expr(e){}
+Brackets::Brackets(LValue *lval, Expr* e):lvalue(lval),expr(e){
+	if (lval->isConst()) this->setConst();
+}
 void Brackets::printOn(std::ostream &out) const{
 	out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
 }
@@ -100,8 +103,16 @@ void Goto::printOn(std::ostream &out) const{
 	out<<"Goto("<<label_id<<")";
 }
 
-Let::Let(LValue* lval,Expr* e):lvalue(lval),expr(e),different_types(false),
-	is_right_int(false){}
+Let::Let(LValue* lval,Expr* e):
+		lvalue(lval),expr(e),different_types(false),is_right_int(false){
+	if(lvalue->isConst()){
+		// assignment to constant ("foo":= or "foo"[2]:=)
+		std::ostringstream stream;
+		stream<<"Cannot assign to constant "<<*lvalue;
+		// this->report_error(stream.str().c_str());
+		yyerror(stream.str().c_str());
+	}
+}
 Let::~Let(){delete lvalue; delete expr;}
 void Let::printOn(std::ostream &out) const {
 	out << "Let(" << *lvalue << ":=" << *expr << ")";

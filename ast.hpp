@@ -332,12 +332,19 @@ protected:
 
 class LValue: public Expr{
 public:
-	LValue(bool dyn=false):dynamic(dyn){}
+	LValue(bool dyn=false,bool con=false):dynamic(dyn),is_const(con){}
 	bool isDynamic(){return dynamic;}
 	virtual bool isLValue() const override{return true;}
 	virtual llvm::Value* getAddr()=0;
+	void setConst(){
+		is_const=true;
+	}
+	bool isConst(){
+		return is_const;
+	}
 protected:
 	bool dynamic;
+	bool is_const;
 };
 
 
