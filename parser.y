@@ -20,7 +20,7 @@ Syntax parser for pcl compiler in bison.
 %code{
 	char msg[100];
 	char linebuf[500];
-	struct symbol_loc location;
+	struct symbol_loc location{1,0,1,0};
 }
 
 %define parse.error verbose

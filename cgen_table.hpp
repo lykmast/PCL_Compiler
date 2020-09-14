@@ -130,8 +130,7 @@ public:
 			llvm::Function *f = i->function_lookup(name);
 			if (f != nullptr) return f;
 		}
-		std::cerr << "Cgen:: Unknown function " << name << std::endl;
-		exit(1);
+		return nullptr;
 	}
 private:
 	std::vector<CgenScope> scopes;

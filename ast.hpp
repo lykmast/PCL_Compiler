@@ -52,9 +52,8 @@ public:
 	virtual void sem(){}
 	void report_error( const char*msg){
 		std::cerr<<
-			location.first_line<<","<< location.first_column << "-" <<
-			location.last_line<<","<< location.last_column <<": " <<
-			msg << " in line:\n"<<linebuf<<std::endl;
+			"Line "<<location.last_line<<
+			": " <<msg << "\n"<<linebuf<<std::endl;
 		exit(1);
 	}
 protected:

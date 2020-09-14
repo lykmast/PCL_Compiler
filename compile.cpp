@@ -1032,6 +1032,12 @@ std::vector<llvm::Value*> ExprList::cgen(std::vector<bool> by_ref){
 
 llvm::Value* Call::cgen_common(){
 	llvm::Function* callee = ct.function_lookup(name);
+	if(!callee){
+		std::ostringstream stream;
+		stream << "Cgen:: Unknown function " << name ;
+		this->report_error_from_child(stream.str().c_str());
+		exit(1);
+	}
 	std::vector<llvm::Value*> args = exprs->cgen(by_ref);
 	// all outer vars are passed by reference
 	std::vector<llvm::Value*> outer =
