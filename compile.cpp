@@ -137,6 +137,20 @@ llvm::Value* Bconst::cgen(){
 
 llvm::Value* Sconst::cgen(){
 	//1. Initialize chars vector
+	std::vector<llvm::Constant *> chars(str.length());
+	for(unsigned int i = 0; i < str.size(); i++) {
+		chars[i] = llvm::ConstantInt::get(i8, str[i]);
+	}
+
+	//1b. add a zero terminator too
+	chars.push_back(llvm::ConstantInt::get(i8, 0));
+
+	auto stringType = llvm::ArrayType::get(i8, chars.size());
+	return llvm::ConstantArray::get(stringType, chars);
+}
+
+llvm::Value* Sconst::getAddr(){
+	//1. Initialize chars vector
 	UniqueID uid;
 	std::vector<llvm::Constant *> chars(str.length());
 	for(unsigned int i = 0; i < str.size(); i++) {
