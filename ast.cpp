@@ -235,6 +235,12 @@ void Procedure::printOn(std::ostream &out) const {
 	else
 		out<<decl_type<<"(<forward>,"<<*formals<<")";
 }
+void Procedure::toForward(){
+	is_forward=true;
+}
+bool Procedure::isForward(){
+	return is_forward;
+}
 
 Function::Function(std::string name, DeclList *decl_list, TSPtr return_type, Body* bod)
 	:Procedure(name,decl_list,bod,"function"), ret_type(return_type){}

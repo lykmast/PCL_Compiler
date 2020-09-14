@@ -744,17 +744,21 @@ public:
 		Body* bod, std::string decl_type="procedure");
 
 	virtual void printOn(std::ostream &out) const override;
-
 	void add_body(Body* bod);
 
 	virtual void sem() override;
 
 	virtual void cgen() override;
+
+	void toForward();
+
+	bool isForward();
 protected:
 	void sem_helper(bool isFunction=false, TSPtr ret_type=nullptr);
 	Body* body;
 	FormalDeclList* formals;
 	SPtr<CallableType> type;
+	bool is_forward=false;
 };
 
 class Function:public Procedure{

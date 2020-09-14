@@ -456,10 +456,11 @@ void Procedure::sem_helper(bool isFunction, TSPtr ret_type){
 			);
 		}
 		st.insert_function(id,subp_type,body);
-		if(body->isLibrary()){
-			// library subprogram; setup type
-			type = subp_type;
-		}
+		type=subp_type;
+		// if(body->isLibrary()){
+		// 	// library subprogram; setup type
+		// 	type = subp_type;
+		// }
 		// no body to sem; return.
 		return;
 	}
@@ -468,6 +469,7 @@ void Procedure::sem_helper(bool isFunction, TSPtr ret_type){
 	if(e){ // existent previous declaration.
 		// attach body to previous declaration.
 		e->body->add_body(body);
+		type=e->type;
 	}
 	else{ // first declaration of this subprogram
 		SPtr<CallableType> subp_type;

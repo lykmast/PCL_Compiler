@@ -184,10 +184,6 @@ llvm::Value* Sconst::getAddr(){
 
 }
 
-llvm::Value* Sconst::getAddr(){
-	return cgen();
-}
-
 
 llvm::Value* NilConst::cgen(){
 	// i8* by default; will probably be changed by cast
@@ -845,12 +841,21 @@ void Procedure::cgen(){
 		//   with C library functions.
 		call_name += "_pcl";
 	}
-	llvm::Function* F = llvm::Function::Create(
-		FT, llvm::Function::ExternalLinkage, call_name, TheModule.get()
-	);
-	// insert function to current scope of cgen table.
-	ct.insert_function(id, F);
+	llvm::Function* callee = ct.function_lookup(call_name);
+	llvm::Function* F;
+	if(callee){
+		// function is already created (as a header).
+		F=callee;
+	}
+	else{
+		F = llvm::Function::Create(
+			FT, llvm::Function::ExternalLinkage, call_name, TheModule.get()
+		);
+		// insert function to current scope of cgen table.
+		ct.insert_function(id, F);
+	}
 	if(body->isLibrary()) return;
+	if(this->isForward()) return;
 
 	ct.openScope(F);
 	// open new scope for subprogram.

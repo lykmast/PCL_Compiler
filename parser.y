@@ -132,7 +132,7 @@ local:
   "var" var_decl {$$ = $2;}
 | "label" mult_ids ';' {$2->toLabel(); $$=$2;}
 | header ';' body ';' {$1->add_body($3); $$=new DeclList($1);$$->add_parse_info(location, linebuf);}
-| "forward" header ';' {$$ = new DeclList($2);$$->add_parse_info(location, linebuf);}
+| "forward" header ';' {$2->toForward();$$ = new DeclList($2);$$->add_parse_info(location, linebuf);}
 ;
 
 var_decl:
