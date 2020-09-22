@@ -300,7 +300,7 @@ public:
 	virtual TSPtr get_type()=0;
 	virtual llvm::Value* cgen()=0;
 	virtual bool isLValue() const{return false;}
-	virtual Expr* simplify(int count) {return nullptr;}
+	virtual Expr* simplify(int &count) {return nullptr;}
 };
 
 class Stmt: virtual public AST {
@@ -448,7 +448,7 @@ public:
 
 	LValue* get_lvalue(){ return lvalue;}
 
-	Expr* simplify(int &count);
+	virtual Expr* simplify(int &count) override;
 
 	virtual llvm::Value* cgen() override;
 protected:
@@ -468,7 +468,7 @@ public:
 
 	Expr* get_expr(){ return expr;}
 
-	Expr* simplify(int &count);
+	virtual Expr* simplify (int &count) override;
 
 	virtual llvm::Value* cgen() override;
 

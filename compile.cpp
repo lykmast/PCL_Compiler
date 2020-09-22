@@ -163,7 +163,6 @@ llvm::Value* Sconst::getAddr(){
 
 	//2. Initialize the string from the characters
 	auto stringType = llvm::ArrayType::get(i8, chars.size());
-	auto stringNoSizeType = llvm::ArrayType::get(i8, 0);
 	//3. Create the declaration statement
 	std::string id = ".str"+std::to_string(uid.id);
 	auto globalDeclaration =
@@ -485,7 +484,7 @@ llvm::Value* Op::cgen(){
 		// if leftValue -> short circuit; else no short circuit
 		//    convert i8 lvalue to i1.
 		llvm::Value* CondV = Builder.CreateTrunc(leftValue, i1, "cond");
-		Builder.CreateCondBr(leftValue, ShortCircuitBB, NoShortCircuitBB);
+		Builder.CreateCondBr(CondV, ShortCircuitBB, NoShortCircuitBB);
 
 		/* short-circuit block*/
 		ct.setCurrentBB(ShortCircuitBB);
@@ -888,7 +887,7 @@ void Procedure::cgen(){
 	unsigned os=outer_vars.size();
 
 	for(auto &Arg : F->args()){
-		llvm::AllocaInst* alloca;
+		llvm::AllocaInst* alloca = nullptr;
 		if(Idx_formal<fs){
 			/* formal argument */
 
@@ -959,14 +958,14 @@ static void create_mem_funcs(){
 	llvm::FunctionType* malloc_type = llvm::FunctionType::get(
 		llvm::PointerType::get(i8, 0), std::vector<llvm::Type *>{i64}, false
 	);
-	llvm::Function* malloc_f = llvm::Function::Create(
+	llvm::Function::Create(
 		malloc_type, llvm::Function::ExternalLinkage, "malloc", TheModule.get()
 	);
 	// create 'void free(i8*)'
 	llvm::FunctionType* free_type = llvm::FunctionType::get(
 		voidTy, llvm::PointerType::get(i8, 0), false
 	);
-	llvm::Function* free_f = llvm::Function::Create(
+	llvm::Function::Create(
 		free_type, llvm::Function::ExternalLinkage, "free", TheModule.get()
 	);
 }
