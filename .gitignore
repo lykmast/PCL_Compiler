@@ -11,3 +11,4 @@ parser.hpp
 *.cson
 *.gdb
 *.inp
+*.imm
