@@ -25,6 +25,15 @@ bool Type::doCompare(TSPtr t){
 		or !t->get_name().compare("any");
 }
 
+bool Type::is_incomplete(){
+	if(!name.compare("array")){
+		ArrType* arrType = static_cast<ArrType*>(this);
+		if(arrType->get_size()==-1){
+			return true;
+		}
+	}
+	return false;
+}
 
 PtrType::PtrType(TSPtr t):Type("pointer"),type(t){}
 

@@ -208,6 +208,9 @@ void Let::sem(){
 		std::ostringstream stream;
 		stream<<"Could not assign '"<<*expr<<"' of type '"<<
 			*rType<<"' to '"<<*lvalue<<"' of type '"<<*lType<<"'";
+		if(lType->is_incomplete()){
+			stream<<" (incomplete types are not assignable)";
+		}
 		stream<<".";
 		this->report_error(stream.str().c_str());
 		exit(1);
@@ -233,6 +236,10 @@ bool Let::typecheck(TSPtr lType, TSPtr rType){
 	// any(untyped) is incompatible with other types.
 	if(!rType->get_name().compare("any")){
 		// error; probably from nil^.
+		return false;
+	}
+	// no type is compatible with incomplete type.
+	if(lType->is_incomplete() or rType->is_incomplete()){
 		return false;
 	}
 	// same types are compatible

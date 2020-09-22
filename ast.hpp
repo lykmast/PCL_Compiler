@@ -88,6 +88,8 @@ public:
 
 	virtual llvm::Type* cgen(){return nullptr;}
 
+	bool is_incomplete();
+
 protected:
 	std::string name;
 };
