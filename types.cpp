@@ -13,7 +13,7 @@ std::string Type::get_name(){
 }
 
 void Type::printOn(std::ostream &out) const{
-	out << "Type(" << name << ")";
+	out << name;
 }
 // Type* Type::clone(){return this;}
 bool Type::should_delete() const{//should not delete Singleton
@@ -40,7 +40,7 @@ PtrType::PtrType(std::string name,TSPtr t):Type(name),type(t){}
 // }
 TSPtr PtrType::get_type(){ return type;}
 void PtrType::printOn(std::ostream &out) const {
-	out << "PtrType(" << name <<"of type "<< *type << ")";
+	out << "^ "<<*type;
 }
 bool PtrType::should_delete() const{
 	return true;
@@ -75,7 +75,12 @@ bool ArrType::doCompare(TSPtr t){
 	return false;
 }
 void ArrType::printOn(std::ostream &out) const {
-	out << "ArrType(" << name <<"["<<size<<"]"<<"of type "<< *type << ")";
+	if(size>0){
+		out <<"array"<<"["<<size<<"]"<<" of "<< *type;
+	}
+	else{
+		out <<"array of "<< *type;
+	}
 }
 
 bool ArrType::is_1D(){
@@ -100,8 +105,8 @@ void CallableType::typecheck_args(std::vector<TSPtr> arg_types){
 	}
 	for(uint i=0; i<arg_types.size(); i++){
 		if(!formal_types[i]->doCompare(arg_types[i])){
-			std::cerr<<"Expected argument "<<i<<" to be "<<*formal_types[i]
-				<<" but it was "<<*arg_types[i]<<std::endl;
+			std::cerr<<"Expected argument '"<<i<<"' to be of type '"<<*formal_types[i]
+				<<"' but it was of type '"<<*arg_types[i]<<"'"<<std::endl;
 				exit(1);
 		}
 	}
@@ -119,7 +124,7 @@ void CallableType::check_passing(std::vector<bool> ref){
 				whatisnt="by reference";
 				whatis="by value";
 			}
-			std::cerr<<"Expected argument "<<i<<"of "<<name<<" to be passed "<<whatisnt
+			std::cerr<<"Expected argument '"<<i<<"' of subprogram '"<<name<<"' to be passed "<<whatisnt
 				<<", but it was passed "<<whatis<<"."<<std::endl;
 				exit(1);
 		}

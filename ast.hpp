@@ -52,7 +52,7 @@ public:
 	virtual void sem(){}
 	void report_error( const char*msg){
 		std::cerr<<
-			"Line "<<location.last_line<<
+			"Line "<<location.first_line<<
 			": " <<msg << "\n"<<linebuf<<std::endl;
 		exit(1);
 	}

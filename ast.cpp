@@ -14,33 +14,33 @@ Const::Const(TSPtr ty):type(ty){}
 
 Rconst::Rconst(double n):Const(REAL::getInstance()),num(n){}
 void Rconst::printOn(std::ostream &out) const{
-	out << "Rconst(" << num << ")";
+	out << num;
 }
 
 Iconst::Iconst(int n):Const(INTEGER::getInstance()),num(n){}
 void Iconst::printOn(std::ostream &out) const{
-	out << "Iconst(" << num << ")";
+	out << num;
 }
 
 Cconst::Cconst(char c):Const(CHARACTER::getInstance() ),ch(c){}
 void Cconst::printOn(std::ostream &out) const {
-	out << "Cconst(" << ch << ")";
+	out << "'" << ch << "'";
 }
 
 NilConst::NilConst():Const(std::make_shared<PtrType>(PtrType(ANY::getInstance()))){}
 void NilConst::printOn(std::ostream &out) const {
-	out << "NilConst("<<*type<< ")";
+	out << "nil";
 }
 
 // LValue(false,true): Sconst is not dynamic but constant.
 Sconst::Sconst(std::string s):LValue(false,true),str(s){}
 void Sconst::printOn(std::ostream &out) const {
-	out<< "Sconst("<<str<<")";
+	out<< "\""<<str<<"\"";
 }
 
 Id::Id(std::string v): name(v), type(nullptr) {}
 void Id::printOn(std::ostream &out) const {
-	out << "Id(" << name <<")";
+	out << name;
 }
 
 
@@ -48,7 +48,7 @@ void Id::printOn(std::ostream &out) const {
 Bconst::Bconst(bool b):Const(BOOLEAN::getInstance()),boo(b){}
 
 void Bconst::printOn(std::ostream &out) const {
-	out << "Bconst(" << boo <<")";
+	out <<  boo;
 }
 
 
@@ -63,13 +63,13 @@ Op::~Op() {
 	// delete_type(leftType); delete_type(rightType); delete_type(resType);
 }
 void Op::printOn(std::ostream &out) const {
-	if(right) out << op << "(" << *left << ", " << *right << ")";
-	else  out << op << "(" << *left << ")";
+	if(right) out <<"("<< *left<<" "<< op << " "<< *right<<")";
+	else  out<<"(" << op  << *left <<")";
 }
 
 Reference::Reference(LValue* lval):lvalue(lval), count(0){}
 void Reference::printOn(std::ostream &out) const {
-	out << "Reference" << "(" << *lvalue << ")";
+	out << "(@" << *lvalue << ")";
 }
 
 
@@ -78,7 +78,7 @@ void Reference::printOn(std::ostream &out) const {
 
 Dereference::Dereference(Expr *e):expr(e), count(0){}
 void Dereference::printOn(std::ostream &out) const {
-	out << "Dereference" << "(" << *expr << ")";
+	out << "(" << *expr << "^)";
 }
 
 
@@ -86,7 +86,7 @@ Brackets::Brackets(LValue *lval, Expr* e):lvalue(lval),expr(e){
 	if (lval->isConst()) this->setConst();
 }
 void Brackets::printOn(std::ostream &out) const{
-	out << "Brackets" << "(" << *lvalue<< ", " << *expr << ")";
+	out << *lvalue<< "[" << *expr << "]";
 }
 
 LabelStmt::LabelStmt(std::string id, Stmt* s):label_id(id), stmt(s) {}

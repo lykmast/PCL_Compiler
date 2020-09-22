@@ -90,21 +90,21 @@ W [ \t\r\n]
 <STRING>\\\\ {s->push_back('\\');}
 <STRING>[^'\"] {s->push_back(yytext[0]);/*'*/}
 <STRING>\" {BEGIN(INITIAL);yylval.var=s; return T_sconst;/*"*/}
-<STRING>.$ {yyerror("unterminated string");}
-<STRING>. {sprintf(msg,"invalid character '%c' while parsing string",yytext[0]);yyerror(msg);}
+<STRING>.$ {yyerror("Unterminated string.");}
+<STRING>. {sprintf(msg,"Invalid character '%c' while parsing string.",yytext[0]);yyerror(msg);}
 
 
 \' {BEGIN(CHARACTER); added=false;/*'*/}
-<CHARACTER>\\n {if(!added){c='\n'; added=true;}else yyerror("too long for character");}
-<CHARACTER>\\t {if(!added){c='\t'; added=true;}else yyerror("too long for character");}
-<CHARACTER>\\r {if(!added){c='\r'; added=true;}else yyerror("too long for character");}
-<CHARACTER>\\0 {if(!added){c='\0'; added=true;}else yyerror("too long for character");}
-<CHARACTER>\\\' {if(!added){c='\''; added=true;}else yyerror("too long for character");}
-<CHARACTER>\\\" {if(!added){c='\"'; added=true;}else yyerror("too long for character");/*"*/}
-<CHARACTER>\\\\ {if(!added){c='\\'; added=true;}else yyerror("too long for character");}
-<CHARACTER>[^'\"] {if(!added){c=yytext[0]; added=true;}else yyerror("too long for character");/*'*/}
+<CHARACTER>\\n {if(!added){c='\n'; added=true;}else {yyerror("Too long for character.");}}
+<CHARACTER>\\t {if(!added){c='\t'; added=true;}else {yyerror("Too long for character.");}}
+<CHARACTER>\\r {if(!added){c='\r'; added=true;}else {yyerror("Too long for character.");}}
+<CHARACTER>\\0 {if(!added){c='\0'; added=true;}else {yyerror("Too long for character.");}}
+<CHARACTER>\\\' {if(!added){c='\''; added=true;}else {yyerror("Too long for character.");}}
+<CHARACTER>\\\" {if(!added){c='\"'; added=true;}else {yyerror("Too long for character.");}/*"*/}
+<CHARACTER>\\\\ {if(!added){c='\\'; added=true;}else {yyerror("Too long for character.");}}
+<CHARACTER>[^'\"] {if(!added){c=yytext[0]; added=true;}else {yyerror("Too long for character.");}/*'*/}
 <CHARACTER>\' {BEGIN(INITIAL);yylval.ch=c; return T_cconst;/*'*/}
-<CHARACTER>. {sprintf(msg,"invalid character %c",yytext[0]);yyerror(msg); }
+<CHARACTER>. {sprintf(msg,"Invalid character '%c'.",yytext[0]);yyerror(msg); }
 
 ":=" {return T_assign;}
 "<>" {return T_dt;}
@@ -123,11 +123,8 @@ W [ \t\r\n]
 %%
 
 void yyerror(const char *msg) {
-
-	fprintf(stderr, "%d,%d-%d,%d: %s at %s in line:\n %s\n",
-		location.first_line, location.first_column,
-		location.last_line, location.last_column,
-		msg,yytext,linebuf);
+	fprintf(stderr, "Line %d: %s\n%s\n",
+		location.first_line,msg,linebuf);
 	exit(1);
 }
 
