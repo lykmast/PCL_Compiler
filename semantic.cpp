@@ -104,11 +104,11 @@ void Op::sem(){
 		return;
 	}
 	//UNOP
-	if(!(op.compare("+")) or !(op.compare("-")))
+	if(!(op.compare("+")) or !(op.compare("-"))){
 		//real or int operand-> real or int result
 		if( leftType->doCompare(REAL::getInstance()) or leftType->doCompare(INTEGER::getInstance()) )
 			resType = leftType;
-
+	}
 	else if(!(op.compare("not"))){
 		//bool operand-> bool result
 		if(leftType->doCompare(BOOLEAN::getInstance()) )
