@@ -48,10 +48,15 @@ bool PtrType::should_delete() const{
 
 
 bool PtrType::doCompare(TSPtr t){
-	if (!(name.compare(t->get_name()))){
-		SPtr<PtrType> pTy = std::static_pointer_cast<PtrType>(t);
-		TSPtr inType(pTy->get_type());
-		return type->doCompare(inType);
+	if (Type::doCompare(t)){
+		if(!t->get_name().compare("any")){
+			return true;
+		}
+		else{
+			SPtr<PtrType> pTy = std::static_pointer_cast<PtrType>(t);
+			TSPtr inType(pTy->get_type());
+			return type->doCompare(inType);
+		}
 	}
 	return false;
 }
@@ -68,9 +73,14 @@ ArrType::ArrType(TSPtr t):PtrType("array",t),size(-1){}
 int ArrType::get_size(){return size;}
 
 bool ArrType::doCompare(TSPtr t){
-	if (!(name.compare(t->get_name()))){
-		SPtr<ArrType> arrTy = std::static_pointer_cast<ArrType>(t);
-		return size==arrTy->get_size() and type->doCompare(arrTy->get_type());
+	if (Type::doCompare(t)){
+		if(!t->get_name().compare("any")){
+			return true;
+		}
+		else{
+			SPtr<ArrType> arrTy = std::static_pointer_cast<ArrType>(t);
+			return size==arrTy->get_size() and type->doCompare(arrTy->get_type());
+		}
 	}
 	return false;
 }

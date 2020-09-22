@@ -197,8 +197,12 @@ void Let::sem(){
 	lvalue->sem();
 	TSPtr lType (lvalue->get_type());
 	TSPtr rType(expr->get_type());
-	if(lType->doCompare(rType)) return;
-
+	if((rType->get_name().compare("any")) and (lType->doCompare(rType))){
+	// if same types (not any) return.
+		if(!lType->is_incomplete() and !rType->is_incomplete()){
+			return;
+		}
+	}
 	different_types=true;
 	if(!typecheck(lType,rType)){
 		std::ostringstream stream;
@@ -226,6 +230,11 @@ void Goto::sem(){
 
 bool Let::typecheck(TSPtr lType, TSPtr rType){
  /* is rType compatible for assignment with lType? */
+	// any(untyped) is incompatible with other types.
+	if(!rType->get_name().compare("any")){
+		// error; probably from nil^.
+		return false;
+	}
 	// same types are compatible
 	if(lType->doCompare(rType)) return true;
 
