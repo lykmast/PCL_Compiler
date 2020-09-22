@@ -1,49 +1,53 @@
-CC=g++
-CFLAGS=-Wall
-# compiler: compiler.lex.o compiler.tab.o symbol.o symbolc.o
-# 	$(CC) $(CFLAGS) -o compiler compiler.lex.o compiler.tab.o \
-# 	symbol.o symbolc.o
-#
-# compiler.lex.c: compiler.l compiler.tab.h
-# 	flex -it compiler.l > compiler.lex.c
-#
-# compiler.tab.c compiler.tab.h: compiler.y
-# 	bison -dv compiler.y
-#
-# clean:
-# 	$(RM) *.o compiler.tab.c compiler.tab.h compiler.lex.c core
-#
-# distclean: clean$(RM) compiler
+.PHONY: all
 
-default: pcl
-# pcl_lexer: pcl_lexer.cpp
-# 	$(CC) -o pcl_lexer pcl_lexer.cpp
+CXX=clang++
+CC=clang
+CXXFLAGS=-Wall -std=c++11 `llvm-config --cxxflags`
+LDFLAGS:=`llvm-config --ldflags --system-libs --libs all`
 
-debug: CFLAGS+= -g
+SOURCES=pcl_lexer.cpp parser.cpp ast.cpp types.cpp \
+	semantic.cpp library.cpp uid.cpp compile.cpp
+OBJECTS=$(SOURCES:.cpp=.o)
+
+all: pcl lib.o ## Build project (default choice).
+
+debug: CXXFLAGS+= -g  ## Build project with debug options enabled.
+debug: CXX=g++
+debug: CC=gcc
 debug: pcl
 
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c -o $@ $<
 
-pcl_lexer.cpp:pcl_lexer.l
+pcl_lexer.cpp: pcl_lexer.l
 	flex -s -o pcl_lexer.cpp pcl_lexer.l
 
-pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp symbol.hpp
+pcl_lexer.o: pcl_lexer.cpp pcl_lexer.hpp parser.hpp ast.hpp
 
 parser.hpp parser.cpp: parser.y
 	bison -d -o parser.cpp parser.y
 
-parser.o: parser.cpp pcl_lexer.hpp ast.hpp ast.cpp symbol.hpp
+ast.o: ast.hpp
 
-semantic.o:semantic.cpp symbol.hpp
-	$(CC) $(CFLAGS) -c -o $@ $<
+parser.o: parser.hpp pcl_lexer.hpp ast.hpp
 
-%.o: %.cpp ast.hpp
-	$(CC) $(CFLAGS) -c -o $@ $<
+semantic.o: symbol.hpp ast.hpp
 
-pcl: pcl_lexer.o parser.o ast.o semantic.o runtime.o types.o library.o
-	$(CC) $(CFLAGS) -o $@ $^
+library.o: library.hpp ast.hpp
 
-clean:
-	$(RM) pcl_lexer.cpp parser.cpp parser.hpp parser.output *.o
+compile.o: ast.hpp cgen_table.hpp uid.hpp
 
-distclean: clean
+lib.o: lib.c
+	$(CC) -c -o $@ $<
+
+pcl: $(OBJECTS)
+	$(CXX) -o $@ $(OBJECTS) $(LDFLAGS)
+
+clean:  ## Delete all automatically produced files, excluding final executable.
+	$(RM) pcl_lexer.cpp parser.cpp parser.hpp *.o
+
+distclean: clean ## Delete all automatically produced files, including final executable.
 	$(RM) pcl
+
+help:  ## Display this help.
+	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n\nTargets:\n"} /^[a-zA-Z_-]+:.*?##/ { printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2 }' $(MAKEFILE_LIST)
