@@ -1,0 +1,28 @@
+program ArrayAssignment;
+var arr: array[5] of integer;
+i: integer;
+arr2:array[5] of integer;
+begin
+	i:=0;
+	while i<5 do
+	begin
+		arr[i]:=i;
+		i:=i+1;
+	end;
+	arr2:=arr;
+	arr[2]:=3;
+	i:=0;
+	while i<5 do
+	begin
+		writeInteger(arr2[i]);
+		i:=i+1;
+	end;
+	writeChar('\n');
+	i:=0;
+	while i<5 do
+	begin
+		writeInteger(arr[i]);
+		i:=i+1;
+	end;
+	writeChar('\n');
+	end.

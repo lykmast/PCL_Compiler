@@ -1,0 +1,62 @@
+program ArrayArgument;
+procedure PrintArray (var msg : array of char;
+var x: array of integer; n: integer);
+	var i : integer;
+	begin
+		writeString(msg);
+		i := 0;
+		while i < n do
+		begin
+			if i > 0 then
+				writeString(", ");
+			writeInteger(x[i]);
+			i := i+1
+		end;
+		writeString("\n");
+	end;
+
+var arr,arr2: array[5] of array [5] of integer;
+i,j: integer;
+begin
+	i:=0;
+	while i<5 do
+	begin
+		j:=0;
+		while j<5 do
+		begin
+			arr[i][j]:=i*5+j;
+			j:=j+1;
+		end;
+		i:=i+1;
+	end;
+	writeString("before assignment:\n");
+	j:=0;
+	while j<5 do
+	begin
+		PrintArray("",arr[j],5);
+		j:=j+1;
+	end;
+	arr2:=arr;
+	writeString("arr2 after assignment:\n");
+	j:=0;
+	while j<5 do
+	begin
+		PrintArray("",arr2[j],5);
+		j:=j+1;
+	end;
+	arr2[3][3]:=42; arr2[4][0]:=17;
+	writeString("arr2 after alteration:\n");
+	j:=0;
+	while j<5 do
+	begin
+		PrintArray("",arr2[j],5);
+		j:=j+1;
+	end;
+	writeString("arr should be the same:\n");
+	j:=0;
+	while j<5 do
+	begin
+		PrintArray("",arr[j],5);
+		j:=j+1;
+	end;
+end.

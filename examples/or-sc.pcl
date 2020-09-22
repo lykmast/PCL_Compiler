@@ -1,0 +1,10 @@
+program or_short_circuit;
+function dontrun(): boolean;
+begin
+	writeString("I shouldn\'t have said that! I should *not* have said that!\n");
+	result:=false
+end;
+begin
+	if true or dontrun() then
+		writeString("All is veellll!\n")
+end.

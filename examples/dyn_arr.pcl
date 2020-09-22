@@ -1,0 +1,39 @@
+program dyn_arr;
+procedure PrintArray (var msg : array of char; var g : array of integer; n : integer);
+        var i : integer;
+    begin
+        writeString(msg);
+        i := 0;
+        while i < n do
+        begin
+            if i > 0 then
+            writeString(", ");
+            writeInteger(g[i]);
+            i := i+1
+        end;
+        writeString("\n");
+    end;
+var n,i : integer;
+	y: ^ array of integer;
+	x: array of integer;
+begin
+    n:=60;
+    y := @x;
+		writeString("Before Allocation\n");
+    new [n] y;
+		writeString("After Allocation\n");
+    i := 0;
+    while i < n do
+    begin
+        x[i] := i;
+        (*DEBUG*)
+        writeInteger(i);writeChar(',');
+        writeInteger(x[i]);writeChar('\n');
+        i := i + 1;
+				writeChar('<');
+				writeInteger(i);writeChar(',');
+        writeInteger(n);writeChar('>');writeChar('\n');
+    end;
+
+    PrintArray("Initial array: ", x, n);
+end.

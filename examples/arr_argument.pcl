@@ -1,0 +1,36 @@
+program ArrayArgument;
+procedure PrintArray (var msg : array of char;
+var x: array of integer; n: integer);
+	var i : integer;
+	begin
+		writeString(msg);
+		i := 0;
+		while i < n do
+		begin
+			if i > 0 then
+				writeString(", ");
+			writeInteger(x[i]);
+			i := i+1
+		end;
+		writeString("\n");
+	end;
+
+procedure alter_arr(arr: array[5] of integer);
+	begin
+		arr[3]:=42; arr[2]:=17;
+		PrintArray("In proc:",arr,5)
+	end;
+
+var arr: array[5] of integer;
+i: integer;
+begin
+	i:=0;
+	while i<5 do
+	begin
+		arr[i]:=i;
+		i:=i+1;
+	end;
+	PrintArray("before proc:",arr,5);
+	alter_arr(arr);
+	PrintArray("after proc:", arr, 5);
+end.
