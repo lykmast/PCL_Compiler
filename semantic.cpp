@@ -565,9 +565,20 @@ FunctionEntry* Call::check_passing(){
     check that respective arguments have correct types);
     return FunctionEntry. */
 	FunctionEntry* e = st.function_lookup(name);
+	if(!e){
+		std::ostringstream stream;
+		stream<<"Unknown subprogram '"<<name<<"'.";
+		this->report_error_from_child(stream.str().c_str());
+	}
 	body=e->body;
 	by_ref=e->type->get_by_ref();
 	std::vector<TSPtr> types=e->type->get_types();
+	if(types.size()!=exprs->size()){
+		std::ostringstream stream;
+		stream<<"Call to subprogram '"<<name<<
+			"' has incorrect number of arguments.";
+		this->report_error_from_child(stream.str().c_str());
+	}
 	for(uint i=0; i<types.size();i++){
 		Expr* expr=(*exprs)[i];
 		expr->sem();

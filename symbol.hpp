@@ -75,7 +75,7 @@ public:
 
 	void label_lookup(std::string lbl){
 		if(labels.find(lbl)==labels.end()){
-			std::cerr << "Label " << lbl << " already declared in this scope."
+			std::cerr << "Label " << lbl << " not declared in this scope."
 				<< std::endl;
 			exit(1);
 		}
@@ -130,11 +130,11 @@ public:
 			FunctionEntry *e = i->function_lookup(name);
 			if (e != nullptr) return e;
 		}
-		std::cerr << "Unknown function " << name << std::endl;
-		exit(1);
+		return nullptr;
 	}
 
 	FunctionEntry *function_decl_lookup(std::string name) {
+		// look only in current scope.
 		FunctionEntry* e = scopes.back().function_lookup(name);
 		return e;
 	}
