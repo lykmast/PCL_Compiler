@@ -841,7 +841,8 @@ void Procedure::cgen(){
 		//   with C library functions.
 		call_name += "_pcl";
 	}
-	llvm::Function* callee = ct.function_lookup(call_name);
+	// look only in current scope.
+	llvm::Function* callee = ct.function_decl_lookup(call_name);
 	llvm::Function* F;
 	if(callee){
 		// function is already created (as a header).

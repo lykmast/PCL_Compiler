@@ -132,6 +132,10 @@ public:
 		}
 		return nullptr;
 	}
+
+	llvm::Function* function_decl_lookup(std::string name){
+		return scopes.back().function_lookup(name);
+	}
 private:
 	std::vector<CgenScope> scopes;
 };
